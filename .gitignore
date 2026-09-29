@@ -38,3 +38,6 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+
+# local agent/dev-tool scratch (dev-server preview logs, run metadata)
+.freebuff/
