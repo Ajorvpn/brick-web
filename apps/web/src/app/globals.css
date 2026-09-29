@@ -1,0 +1,226 @@
+@import "tailwindcss";
+@import "../styles/glass_material.css";
+
+/* ============================================================
+   BRICK — design tokens
+   Dark-first material system. Glass levels 0–5.
+   Accent: warm brick / copper. Atmosphere: cyan + violet.
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  /* -- Ink scale (near-black → graphite) -- */
+  --ink-950: #050507;
+  --ink-900: #0a0a0e;
+  --ink-850: #101014;
+  --ink-800: #16161c;
+  --ink-700: #1e1e26;
+  --ink-600: #2a2a34;
+  --ink-500: #3a3a46;
+  --ink-400: #565664;
+  --ink-300: #7c7c8a;
+  --ink-200: #a8a8b4;
+  --ink-100: #d4d4dc;
+  --ink-050: #f0f0f4;
+
+  /* -- Brick accent ramp (warm, restrained) -- */
+  --brick-900: #3b1408;
+  --brick-800: #57200d;
+  --brick-700: #752d12;
+  --brick-600: #94391a;
+  --brick-500: #c44820;
+  --brick-400: #e0552f;
+  --brick-300: #f07a55;
+  --brick-200: #f8a37e;
+  --brick-100: #fccdb4;
+  --brick-050: #feeade;
+
+  /* -- Atmosphere (used sparingly, as light — never as UI fill) -- */
+  --cyan-glow: #58c8dd;
+  --violet-glow: #8b7fd4;
+
+  /* -- Text (dark-first) -- */
+  --text-primary: var(--ink-050);
+  --text-secondary: var(--ink-300);
+  --text-tertiary: var(--ink-400);
+  --text-on-accent: #fff7f3;
+
+  /* -- Glass levels: surface alpha, tint, border, blur -- */
+  --glass-0-surface: rgba(255, 255, 255, 0.02);
+  --glass-0-border: rgba(255, 255, 255, 0.06);
+  --glass-0-blur: 2px;
+
+  --glass-1-surface: rgba(255, 255, 255, 0.035);
+  --glass-1-border: rgba(255, 255, 255, 0.09);
+  --glass-1-blur: 8px;
+
+  --glass-2-surface: rgba(255, 255, 255, 0.055);
+  --glass-2-border: rgba(255, 255, 255, 0.12);
+  --glass-2-blur: 14px;
+
+  --glass-3-surface: rgba(255, 255, 255, 0.08);
+  --glass-3-border: rgba(255, 255, 255, 0.16);
+  --glass-3-blur: 20px;
+
+  --glass-4-surface: rgba(255, 255, 255, 0.1);
+  --glass-4-border: rgba(255, 255, 255, 0.2);
+  --glass-4-blur: 28px;
+
+  --glass-5-surface: rgba(22, 22, 28, 0.72);
+  --glass-5-border: rgba(255, 255, 255, 0.14);
+  --glass-5-blur: 40px;
+
+  /* -- Elevation shadows -- */
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.25);
+  --shadow-2: 0 4px 16px -4px rgb(0 0 0 / 0.35);
+  --shadow-3: 0 12px 40px -8px rgb(0 0 0 / 0.45);
+  --shadow-4: 0 24px 80px -16px rgb(0 0 0 / 0.55);
+
+  /* -- Radii -- */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+
+  /* -- Motion -- */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fast: 150ms;
+  --duration-base: 260ms;
+  --duration-slow: 600ms;
+
+  /* -- Layout -- */
+  --content-width: 72rem;
+  --nav-height: 4rem;
+}
+
+/* -- Font variables supplied by next/font -- */
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+
+  --color-ink-950: var(--ink-950);
+  --color-ink-900: var(--ink-900);
+  --color-ink-850: var(--ink-850);
+  --color-ink-800: var(--ink-800);
+  --color-ink-700: var(--ink-700);
+  --color-ink-600: var(--ink-600);
+  --color-ink-500: var(--ink-500);
+  --color-ink-400: var(--ink-400);
+  --color-ink-300: var(--ink-300);
+  --color-ink-200: var(--ink-200);
+  --color-ink-100: var(--ink-100);
+  --color-ink-050: var(--ink-050);
+
+  --color-brick-900: var(--brick-900);
+  --color-brick-800: var(--brick-800);
+  --color-brick-700: var(--brick-700);
+  --color-brick-600: var(--brick-600);
+  --color-brick-500: var(--brick-500);
+  --color-brick-400: var(--brick-400);
+  --color-brick-300: var(--brick-300);
+  --color-brick-200: var(--brick-200);
+  --color-brick-100: var(--brick-100);
+  --color-brick-050: var(--brick-050);
+
+  --color-cyan-glow: var(--cyan-glow);
+  --color-violet-glow: var(--violet-glow);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  --ease-out-expo: var(--ease-out-expo);
+  --ease-glass: var(--ease-glass);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+
+html {
+  scroll-behavior: smooth;
+  /* Anchor targets clear the floating nav */
+  scroll-padding-top: calc(var(--nav-height) + 1.5rem);
+}
+
+body {
+  background-color: var(--ink-950);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01" on, "cv01" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+::selection {
+  background: rgb(224 85 47 / 0.35);
+  color: var(--text-primary);
+}
+
+/* -- Focus visibility (WCAG 2.2) -- */
+:focus-visible {
+  outline: 2px solid var(--brick-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* -- Skip link -- */
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.625rem 1rem;
+  border-radius: 999px;
+  background: var(--ink-800);
+  color: var(--ink-050);
+  font-size: 0.875rem;
+  transform: translateY(-200%);
+  transition: transform var(--duration-fast) var(--ease-out-expo);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* ============================================================
+   Decorative keyframes (paused under reduced motion via the global rule)
+   ============================================================ */
+@keyframes brick-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(224 85 47 / 0.45);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 0 5px rgb(224 85 47 / 0);
+  }
+}
+
+/* ============================================================
+   Reduced motion: essential transitions only, nothing decorative
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

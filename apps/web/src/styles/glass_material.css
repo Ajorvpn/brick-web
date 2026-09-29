@@ -1,0 +1,131 @@
+/* ============================================================
+   BRICK — Liquid Glass material system v2
+   ------------------------------------------------------------
+   Three material tiers, used by semantic importance:
+
+   1. glass levels 0–5   — blur + tint + rim + noise surfaces
+   2. glass_lens         — REAL refraction of live DOM content via
+                           an SVG feDisplacementMap driven
+                           backdrop-filter (the website-glass
+                           technique), applied ONLY to focal
+                           elements (nav, hero CTA, status pill)
+   3. atmospheric        — background layers, never blurred
+
+   Typography is never put behind heavy blur: contrast first.
+   Fallback: @supports not (backdrop-filter) → solid ink surface.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   The displacement lens (SVG filter, defined in GlassLensProvider).
+   backdrop-filter: url(#id) refracts what is BEHIND the element —
+   genuine contextual distortion, not a fake gradient.
+   Safari note: Safari 18+ supports url() filters in backdrop-filter;
+   older Safari/Firefox fall back to blur-based glass automatically.
+   ------------------------------------------------------------ */
+
+.glass-lens {
+  composes: glass;
+  -webkit-backdrop-filter: blur(2px) url(#brick-lens);
+  backdrop-filter: blur(2px) url(#brick-lens);
+  /* Fallback for engines that reject url() in backdrop-filter:
+     the property is dropped and .glass-lens inherits .glass visuals. */
+}
+
+/* Lens needs a stronger edge to read as a lens. */
+.glass-lens::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.4),
+    rgb(255 255 255 / 0.08) 28%,
+    transparent 62%
+  );
+}
+
+/* ------------------------------------------------------------
+   Fine noise — kills banding on translucent surfaces.
+   Inline SVG feTurbulence data-URI, 3% opacity, no runtime cost.
+   ------------------------------------------------------------ */
+.glass-noise::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: overlay;
+}
+
+/* ============================================================
+   Material tiers by semantic importance
+   ============================================================ */
+
+/* Focal surfaces (nav, primary CTA) — lens + level-3 material */
+.glass-focal {
+  --glass-surface: var(--glass-3-surface);
+  --glass-border: var(--glass-3-border);
+  --glass-blur: var(--glass-3-blur);
+  --glass-shadow: var(--shadow-3);
+}
+
+/* Content surfaces (cards, panels) — level-2 material */
+.glass-content {
+  --glass-surface: var(--glass-2-surface);
+  --glass-border: var(--glass-2-border);
+  --glass-blur: var(--glass-2-blur);
+  --glass-shadow: var(--shadow-2);
+}
+
+/* Secondary surfaces (tiles, chips) — level-1, lighter */
+.glass-secondary {
+  --glass-surface: var(--glass-1-surface);
+  --glass-border: var(--glass-1-border);
+  --glass-blur: var(--glass-1-blur);
+  --glass-shadow: var(--shadow-1);
+}
+
+/* Tertiary — barely-there translucency */
+.glass-tertiary {
+  --glass-surface: var(--glass-0-surface);
+  --glass-border: var(--glass-0-border);
+  --glass-blur: var(--glass-0-blur);
+  --glass-shadow: none;
+}
+
+/* Interactive lift on hover for glass content surfaces.
+   Disabled on coarse pointers and reduced motion. */
+@media (hover: hover) and (pointer: fine) {
+  .glass-interactive {
+    transition:
+      transform 240ms var(--ease-glass),
+      border-color 240ms var(--ease-glass),
+      box-shadow 240ms var(--ease-glass);
+  }
+  .glass-interactive:hover {
+    transform: translateY(-2px);
+    border-color: rgb(255 255 255 / 0.22);
+    box-shadow: var(--shadow-3);
+  }
+}
+
+/* ------------------------------------------------------------
+   Fallbacks — the site must look intentional without the lens.
+   ------------------------------------------------------------ */
+
+/* No backdrop-filter support: opaque ink surfaces, same hierarchy. */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass,
+  .glass-lens {
+  composes: glass;
+    background-color: color-mix(in srgb, var(--ink-800) 86%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-lens {
+  composes: glass;
+    background-color: color-mix(in srgb, var(--ink-850) 94%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
