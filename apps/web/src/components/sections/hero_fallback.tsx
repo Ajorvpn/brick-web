@@ -30,7 +30,10 @@ export function HeroFallback() {
 /** Mobile-positioned variant used below lg. */
 export function HeroFallbackMobile() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 top-[13rem] flex justify-center lg:hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-[13rem] flex justify-center lg:hidden"
+    >
       <GlassSurface
         level={3}
         glow

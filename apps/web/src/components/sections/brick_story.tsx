@@ -69,7 +69,11 @@ function useSceneMode(): SceneMode {
 /** Story phases shown as copy during the pinned sequence. */
 const PHASES = [
   { at: 0.0, label: "Phase 01 · Foundation", title: "A brick." },
-  { at: 0.3, label: "Phase 02 · The build begins", title: "It finds its place." },
+  {
+    at: 0.3,
+    label: "Phase 02 · The build begins",
+    title: "It finds its place.",
+  },
   { at: 0.6, label: "Phase 03 · Masonry", title: "Walls rise from layers." },
   { at: 0.85, label: "Phase 04 · Structure", title: "Built brick by brick." },
 ] as const;
@@ -142,13 +146,21 @@ export function BrickStory() {
       .to({}, { duration: 0.05 });
 
     // Hero copy hands over to the story: fade + lift as the build begins.
-    tl.to("[data-story-copy] > div", { opacity: 0, y: -40, duration: 0.2, ease: "power1.in" }, 0.12);
+    tl.to(
+      "[data-story-copy] > div",
+      { opacity: 0, y: -40, duration: 0.2, ease: "power1.in" },
+      0.12,
+    );
     const copy_st = ScrollTrigger.create({
       trigger: el,
       start: "top top",
       end: "+=800",
       scrub: true,
-      animation: gsap.to("[data-story-copy] > div", { opacity: 0, y: -40, ease: "none" }),
+      animation: gsap.to("[data-story-copy] > div", {
+        opacity: 0,
+        y: -40,
+        ease: "none",
+      }),
     });
     triggers_ref.current.push(copy_st);
 

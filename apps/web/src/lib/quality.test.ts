@@ -47,7 +47,9 @@ describe("webgl capability probe", () => {
   });
 
   it("reports support and hands the probe context straight back", () => {
-    const { loseContext } = mock_gl_context({ renderer: "ANGLE (NVIDIA GeForce RTX 4060)" });
+    const { loseContext } = mock_gl_context({
+      renderer: "ANGLE (NVIDIA GeForce RTX 4060)",
+    });
 
     expect(isWebglAvailable()).toBe(true);
     expect(isSoftwareRenderer()).toBe(false);
@@ -55,7 +57,9 @@ describe("webgl capability probe", () => {
   });
 
   it("probes once, however many callers ask", () => {
-    const { getContext } = mock_gl_context({ renderer: "ANGLE (AMD Radeon Graphics)" });
+    const { getContext } = mock_gl_context({
+      renderer: "ANGLE (AMD Radeon Graphics)",
+    });
 
     isWebglAvailable();
     isSoftwareRenderer();
@@ -63,7 +67,10 @@ describe("webgl capability probe", () => {
 
     // webgl2 answers on the first try, and the verdict is cached after that.
     expect(getContext).toHaveBeenCalledTimes(1);
-    expect(getContext).toHaveBeenCalledWith("webgl2", expect.objectContaining({ antialias: true }));
+    expect(getContext).toHaveBeenCalledWith(
+      "webgl2",
+      expect.objectContaining({ antialias: true }),
+    );
   });
 
   it("flags software rasterisers so the lightest profile is used", () => {
@@ -119,4 +126,3 @@ function mock_gl_context({
 
   return { gl, getContext, loseContext };
 }
-
