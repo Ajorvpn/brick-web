@@ -175,3 +175,59 @@ export function create_brick_texture_set(seed = 0x62726963): brick_texture_set {
 
   return { map: albedo, roughness_map: rough, bump_map: bump };
 }
+
+/**
+ * create_mortar_texture — the bed the bricks sit on.
+ *
+ * The gaps between units are mortar, never raw background: a sanded
+ * cement-gray field with coarse grain, darker where the joint is deepest.
+ * Tiles seamlessly because the pattern never depends on alignment.
+ */
+export function create_mortar_texture(seed = 0x6d6f7274): HTMLCanvasElement {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const rand = make_rng(seed);
+
+  ctx.fillStyle = "#4a4642";
+  ctx.fillRect(0, 0, size, size);
+
+  // coarse sand grain
+  for (let i = 0; i < 4200; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 0.4 + rand() * 1.5;
+    const v = rand();
+    ctx.fillStyle =
+      v > 0.62
+        ? `rgba(196,190,182,${0.05 + rand() * 0.12})`
+        : `rgba(24,22,20,${0.05 + rand() * 0.14})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // trowel smears — broad, very low contrast
+  for (let i = 0; i < 8; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 30 + rand() * 70;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rand() > 0.5 ? "rgba(214,208,198,0.05)" : "rgba(18,16,14,0.07)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  // recessed joint shading — the bed reads deeper than the brick faces
+  const vign = ctx.createLinearGradient(0, 0, 0, size);
+  vign.addColorStop(0, "rgba(0,0,0,0.16)");
+  vign.addColorStop(1, "rgba(0,0,0,0.26)");
+  ctx.fillStyle = vign;
+  ctx.fillRect(0, 0, size, size);
+
+  return canvas;
+}
+

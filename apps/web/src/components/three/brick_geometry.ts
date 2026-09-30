@@ -6,7 +6,7 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { create_brick_texture_set } from "./brick_textures";
+import { create_brick_texture_set, create_mortar_texture } from "./brick_textures";
 
 /** True masonry proportions: 2.15 : 1 : 0.65 */
 export const BRICK_SIZE: [number, number, number] = [2.15, 1, 0.65];
@@ -94,3 +94,36 @@ export function create_brick_material(
     emissiveIntensity: overrides?.emissiveIntensity ?? 0,
   });
 }
+
+let mortar_texture: THREE.Texture | null = null;
+
+/** Shared mortar bed texture — one canvas, reused by every wall. */
+export function get_mortar_texture(): THREE.Texture | null {
+  if (typeof document === "undefined") return null;
+  if (mortar_texture) return mortar_texture;
+  const map = new THREE.CanvasTexture(create_mortar_texture());
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(3, 2);
+  map.anisotropy = 4;
+  mortar_texture = map;
+  return mortar_texture;
+}
+
+/**
+ * create_mortar_material — the bed the courses sit on.
+ *
+ * Rough, unlit-looking cement: it must never compete with the brick faces,
+ * only read as the joint between them (and as the dark recess behind the
+ * half-brick overhangs at the ends of staggered courses).
+ */
+export function create_mortar_material(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    map: get_mortar_texture(),
+    color: new THREE.Color("#8d857c"),
+    roughness: 0.98,
+    metalness: 0,
+    envMapIntensity: 0.08,
+  });
+}
+

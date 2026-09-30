@@ -1,133 +1,175 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import {
   create_brick_geometry,
   create_brick_material,
+  create_mortar_material,
   BRICK_SIZE,
 } from "./brick_geometry";
 import type { QualityProfile } from "@/lib/quality";
 
-interface wall_props {
-  profile: QualityProfile;
-  /** 0..1 wall build progress written by GSAP */
-  build_ref: { current: number };
-  /** 0..1 hero-brick seating progress (skips the slot the hero fills) */
-  seat_ref: { current: number };
-}
+/* ============================================================
+   Masonry facts this file encodes
+   ------------------------------------------------------------
+   1. Running bond: every course is offset half a brick from the one
+      below, so no vertical joint lines up. Without it a wall reads as a
+      stack of tiles, which is the defect this replaces.
+   2. The wall is bottom-anchored and grows upward. WALL_BASE_Y is the
+      base course's resting height and never changes; nothing about the
+      wall's position depends on build progress.
+   3. Units fall. Every brick starts directly above the slot it will
+      occupy — never off to one side, never behind the wall — and travels
+      straight down onto it. The only lateral motion is a damped settle.
+   4. A course is complete before the next one starts. Delays are
+      course-major, so the wall can never show a floating brick in mid-air
+      above a half-finished row: a unit is either still falling to its
+      own slot or seated in it.
+   ============================================================ */
 
-const GAP = 0.055; // mortar joint
+/** Mortar joint between units. */
+const GAP = 0.055;
+/** Units in a full course (staggered courses carry one extra half). */
 const COLS = 4;
-const ROWS = 3;
+/** Courses, base → top. */
+const ROWS = 6;
+/** Depth of the wall plane every unit is seated on. */
+export const WALL_Z = -1.6;
+/** World y of the base course centre — the wall is anchored here. */
+export const WALL_BASE_Y = -2.35;
 
-/**
- * The slot the hero brick seats into: bottom course, true center.
- * Exported so the hero brick's journey can end exactly here.
- */
+export const STEP_X = BRICK_SIZE[0] + GAP;
+export const STEP_Y = BRICK_SIZE[1] + GAP;
+
+/** Vertical span of the finished masonry, in world units. */
+export const WALL_HEIGHT = ROWS * STEP_Y;
+
+/** The hero brick's landing slot: centre of the base course. */
 export const HERO_SLOT: [number, number, number] = [
   0,
-  -((ROWS - 1) / 2) * (BRICK_SIZE[1] + GAP),
-  -1.62,
+  WALL_BASE_Y + BRICK_SIZE[1] / 2,
+  WALL_Z,
 ];
 
+/* Build pacing, as fractions of the whole scrubbed timeline.
+   Last unit starts at (ROWS-1)*COURSE_SPAN + IN_COURSE_STAGGER = 0.66 and
+   lands by 0.83, leaving the tail of the timeline to hold the finished
+   wall — so the reverse scrub always has room to un-build cleanly. */
+const COURSE_SPAN = 0.122;
+const IN_COURSE_STAGGER = 0.05;
+export const FALL_DURATION = 0.17;
+
 export interface wall_brick {
+  /** resting place in world space */
   home: [number, number, number];
+  /** where the fall begins — always straight above `home` */
   from: [number, number, number];
-  tumble: number;
+  /** 0 = base course; the build order is course-major */
+  course: number;
+  /** position within its own course, left → right */
+  index_in_course: number;
+  /** progress at which this unit starts to fall */
   delay: number;
-  hue: number;
-  /** index of the slot reserved for the hero brick (skipped) */
+  /** resting rotation, radians — a few tenths of a degree off true */
+  jitter: [number, number, number];
+  /** 0..1 tonal seed, per unit */
+  tone: number;
+  /** half the units are turned 180° so the face texture never repeats */
+  flip: boolean;
+  /** the slot reserved for the hero brick (left empty by the wall) */
   is_hero_slot: boolean;
 }
 
 /**
- * Pure masonry layout: stretcher bond (running bond) with half-brick
- * offset rows. Deterministic. The center slot of the bottom row is
- * reserved for the hero brick.
+ * make_wall_layout — a complete running-bond wall, in build order.
+ *
+ * Pure and deterministic (seeded LCG, no Math.random) so tests can assert
+ * the masonry rules directly. Rows are emitted bottom-first, left-to-right,
+ * which is also the order they are laid.
  */
-export function make_wall_layout(count: number): wall_brick[] {
+export function make_wall_layout(rows = ROWS, cols = COLS): wall_brick[] {
   let seed = 0x77616c6c;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0xffffffff;
   };
-  const out: wall_brick[] = [];
-  const [bw, bh] = [BRICK_SIZE[0], BRICK_SIZE[1]];
-  const step_x = bw + GAP;
-  const step_y = bh + GAP;
-  const hero_col = Math.floor(COLS / 2);
-  const hero_row = 0; // bottom-center — the foundation course
 
-  for (let r = 0; r < ROWS; r++) {
-    const row_offset = r % 2 === 0 ? 0 : step_x / 2;
-    for (let c = 0; c <= COLS; c++) {
-      const is_hero_slot = r === hero_row && c === hero_col;
-      const home: [number, number, number] = [
-        (c - COLS / 2) * step_x + row_offset,
-        (r - (ROWS - 1) / 2) * step_y,
-        -1.62,
-      ];
-      if (is_hero_slot) {
-        out.push({
-          home,
-          from: home,
-          tumble: 0,
-          delay: 0,
-          hue: 0.5,
-          is_hero_slot: true,
-        });
-        continue;
-      }
-      const side = rand() > 0.5 ? 1 : -1;
+  const out: wall_brick[] = [];
+  const hero_course = 0;
+  const hero_index = Math.floor(cols / 2);
+
+  for (let r = 0; r < rows; r++) {
+    // running bond: odd courses shift half a brick sideways
+    const bond_offset = r % 2 === 1 ? STEP_X / 2 : 0;
+    const units = cols + 1;
+    const y = WALL_BASE_Y + BRICK_SIZE[1] / 2 + r * STEP_Y;
+
+    for (let i = 0; i < units; i++) {
+      const x = (i - cols / 2) * STEP_X - bond_offset;
+      const is_hero_slot = r === hero_course && i === hero_index;
+
       out.push({
-        home,
-        from: [
-          home[0] + side * (10 + rand() * 8),
-          home[1] + 8 + rand() * 5,
-          -10 - rand() * 8,
+        home: [x, y, WALL_Z],
+        // straight above the slot, one full course clear of the top of the
+        // already-built wall — the unit falls down onto it, never up at it
+        from: [x, y + STEP_Y + 1.15, WALL_Z],
+        course: r,
+        index_in_course: i,
+        delay:
+          r * COURSE_SPAN + (i / units) * IN_COURSE_STAGGER + rand() * 0.012,
+        jitter: [
+          (rand() - 0.5) * 0.012,
+          (rand() - 0.5) * 0.016,
+          (rand() - 0.5) * 0.01,
         ],
-        tumble: (rand() - 0.5) * 1.1,
-        // seating window: last delay ≈ 0.40 so every brick settles fully
-        // before build reaches 1.0 (0.40 + 0.42 ≤ 1.0)
-        delay: (out.length / count) * 0.30 + rand() * 0.10,
-        hue: rand(),
-        is_hero_slot: false,
+        tone: rand(),
+        flip: rand() > 0.5,
+        is_hero_slot,
       });
     }
   }
+
   return out;
+}
+
+interface wall_props {
+  profile: QualityProfile;
+  /** 0..1 wall build progress, written by GSAP */
+  build_ref: { current: number };
+  /** 0..1 hero-brick seating progress (the hero owns its own brick) */
+  seat_ref?: { current: number };
 }
 
 /**
  * BrickWall — one physical masonry wall.
- * InstancedMesh (canonical geometry + shared material); only transforms
- * and per-instance color vary. A dark backing plane + joint spacing read
- * as mortar.
+ *
+ * Bottom-anchored and built strictly upward, course by course: the base
+ * course is laid first and never moves again, each unit falls from directly
+ * above onto the top of what has already been built, and the camera (see
+ * brick_story_scene) rises to keep the newest course in frame.
+ *
+ * One InstancedMesh carries every unit, so the whole wall costs a single
+ * draw call; only transforms and per-unit tint vary per frame.
  */
-export function BrickWall({ build_ref }: wall_props) {
-  const layout = useMemo(
-    () => make_wall_layout(COLS * ROWS + 2),
-    [],
-  );
+export function BrickWall({ profile, build_ref }: wall_props) {
+  const layout = useMemo(() => make_wall_layout(), []);
   const count = layout.length;
   const mesh_ref = useRef<THREE.InstancedMesh>(null);
-  const material = useMemo(() => create_brick_material(), []);
   const geometry = useMemo(() => create_brick_geometry(), []);
+  const material = useMemo(() => create_brick_material({ bump_scale: 0.62 }), []);
+  const mortar = useMemo(() => create_mortar_material(), []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
-  void useThree;
 
-  // InstancedMesh cannot skip an index, so the hero slot instance stays
-  // at zero scale until the hero seats — then it hides forever.
+  // Park every instance out of frame until its course is laid.
   useEffect(() => {
     const mesh = mesh_ref.current;
     if (!mesh) return;
     mesh.frustumCulled = false;
-    // initialize all matrices offscreen
     dummy.position.set(0, -999, 0);
-    dummy.scale.setScalar(0.001);
+    dummy.scale.setScalar(0.0001);
     dummy.updateMatrix();
     for (let i = 0; i < count; i++) mesh.setMatrixAt(i, dummy.matrix);
     mesh.instanceMatrix.needsUpdate = true;
@@ -137,58 +179,93 @@ export function BrickWall({ build_ref }: wall_props) {
     const mesh = mesh_ref.current;
     if (!mesh) return;
     const build = build_ref.current;
-    
 
-    layout.forEach((b, i) => {
+    for (let i = 0; i < count; i++) {
+      const b = layout[i]!;
+
+      // The hero brick owns its slot; the wall always leaves it empty.
       if (b.is_hero_slot) {
-        // the hero brick occupies this slot; keep the instance hidden
-        dummy.scale.setScalar(0.001);
         dummy.position.set(0, -999, 0);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.setScalar(0.0001);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
-        return;
+        continue;
       }
-      const local = THREE.MathUtils.clamp((build - b.delay) / 0.42, 0, 1);
-      const e = 1 - Math.pow(1 - local, 3); // cubic settle
-      const scale = local <= 0 ? 0.001 : 0.62 + 0.38 * e;
+
+      const local = THREE.MathUtils.clamp(
+        (build - b.delay) / FALL_DURATION,
+        0,
+        1,
+      );
+
+      // Not yet falling: staged above its slot, still invisible.
+      if (local <= 0) {
+        dummy.position.set(b.from[0], b.from[1], b.from[2]);
+        dummy.rotation.set(0, b.flip ? Math.PI : 0, 0);
+        dummy.scale.setScalar(0.0001);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      // The drop: accelerate, then settle. Strictly downward — the lateral
+      // term is a damped wobble that is exactly zero at the slot, so the
+      // unit always arrives flat on the course beneath it.
+      const fall = local * local * (3 - 2 * local);
+      const settle = Math.sin(local * Math.PI * 2) * (1 - local) * 0.05;
 
       dummy.position.set(
-        THREE.MathUtils.lerp(b.from[0], b.home[0], e),
-        THREE.MathUtils.lerp(b.from[1], b.home[1], e),
-        THREE.MathUtils.lerp(b.from[2], b.home[2], e),
+        THREE.MathUtils.lerp(b.from[0], b.home[0], fall) + settle,
+        THREE.MathUtils.lerp(b.from[1], b.home[1], fall),
+        THREE.MathUtils.lerp(b.from[2], b.home[2], fall),
       );
+      // rotation eases to the unit's own tiny jitter — never a perfect grid
       dummy.rotation.set(
-        b.tumble * (1 - e),
-        b.tumble * 0.55 * (1 - e),
-        b.tumble * 0.35 * (1 - e),
+        b.jitter[0] * fall,
+        (b.flip ? Math.PI : 0) + b.jitter[1] * fall,
+        b.jitter[2] * fall,
       );
-      dummy.scale.setScalar(scale);
+      dummy.scale.setScalar(0.94 + 0.06 * fall);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
 
-      // tonal variation only — the albedo is baked full-color, so instance
-      // color stays a near-neutral multiplier (value 0.78–1.02, slight warmth)
-      const v = 0.78 + b.hue * 0.24;
-      color.setRGB(v, v * 0.985, v * 0.965);
+      // Per-unit firing variation: no two bricks in the wall are the same
+      // tone, and about half are turned 180° so the face texture never
+      // repeats visibly across neighbours.
+      const v = 0.74 + b.tone * 0.32;
+      const warm = b.tone - 0.5;
+      color.setRGB(v * (1 + warm * 0.05), v, v * (1 - warm * 0.04));
       mesh.setColorAt(i, color);
-    });
+    }
+
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   });
 
+  const bed_height = (ROWS - 1) * STEP_Y + BRICK_SIZE[1] + 0.5;
+  const bed_centre_y = WALL_BASE_Y + ((ROWS - 1) * STEP_Y) / 2;
+
   return (
     <group>
-      {/* mortar backing: dark neutral plane behind the joints */}
-      <mesh position={[0, 0, -1.62 - BRICK_SIZE[2] / 2 - 0.004]} receiveShadow>
-        <planeGeometry args={[COLS * (BRICK_SIZE[0] + GAP) + 1, ROWS * (BRICK_SIZE[1] + GAP) + 0.6]} />
-        <meshStandardMaterial color="#241f1c" roughness={1} metalness={0} />
+      {/* Mortar bed behind the joints: every gap between units shows joint,
+          never raw background, and it also backs the half-brick overhangs
+          at the ends of staggered courses. */}
+      <mesh
+        position={[0, bed_centre_y, WALL_Z - BRICK_SIZE[2] / 2 - 0.012]}
+        material={mortar}
+        receiveShadow
+      >
+        <planeGeometry args={[(COLS + 1) * STEP_X + 0.6, bed_height]} />
       </mesh>
+
       <instancedMesh
         ref={mesh_ref}
         args={[geometry, material, count]}
-        castShadow
+        castShadow={profile.tier !== "low"}
         receiveShadow
       />
     </group>
   );
 }
+
