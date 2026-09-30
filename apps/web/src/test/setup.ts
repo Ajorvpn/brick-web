@@ -3,9 +3,10 @@ import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
 /**
- * jsdom ships no matchMedia, yet components read `prefers-reduced-motion` and
- * `(pointer: coarse)` while mounting. The honest stub: nothing matches, so
- * tests exercise the full-motion path and nothing hangs on a missing API.
+ * jsdom ships neither matchMedia nor IntersectionObserver, yet components read
+ * both while mounting (`prefers-reduced-motion`, `(pointer: coarse)`, and the
+ * viewport-entry observer inside Reveal). These are the smallest honest stubs:
+ * nothing matches, and nothing is ever observed.
  */
 if (typeof window !== "undefined" && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({
@@ -18,6 +19,20 @@ if (typeof window !== "undefined" && !window.matchMedia) {
     removeEventListener: () => {},
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
+}
+
+if (
+  typeof window !== "undefined" &&
+  typeof window.IntersectionObserver === "undefined"
+) {
+  window.IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
 }
 
 afterEach(() => {

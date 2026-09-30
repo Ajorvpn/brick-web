@@ -26,7 +26,7 @@ const project_links = [
 /** Footer — real destinations only. No fake socials, no fake metrics. */
 export function SiteFooter() {
   return (
-    <footer className="border-t border-white/8 bg-ink-950">
+    <footer className="glass glass-2 relative mt-10 rounded-none border-x-0 border-b-0">
       <div className="mx-auto max-w-[var(--content-width)] px-6 py-14 sm:px-8">
         <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
           <div>

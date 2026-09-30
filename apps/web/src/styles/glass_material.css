@@ -1,131 +1,246 @@
 /* ============================================================
-   BRICK — Liquid Glass material system v2
+   BRICK — Liquid Glass material system v3
    ------------------------------------------------------------
-   Three material tiers, used by semantic importance:
+   v2 shipped the *consumers* of this system but never the material
+   itself: `.glass`, `.glass-0` … `.glass-5` and `.glass-glow` were
+   emitted by <GlassSurface> and referenced from this very file, yet
+   defined nowhere. Every panel therefore rendered as a bare rectangle
+   — no tint, no border, no backdrop-filter — which is exactly the
+   "flat dark box" defect. `composes: glass;` (CSS-Modules syntax) did
+   nothing in a global stylesheet either. Both are fixed here, and
+   src/styles/glass_system.test.ts asserts that the base material and
+   every class GlassSurface emits stay defined, so this cannot silently
+   regress again.
 
-   1. glass levels 0–5   — blur + tint + rim + noise surfaces
-   2. glass_lens         — REAL refraction of live DOM content via
-                           an SVG feDisplacementMap driven
-                           backdrop-filter (the website-glass
-                           technique), applied ONLY to focal
-                           elements (nav, hero CTA, status pill)
-   3. atmospheric        — background layers, never blurred
+   The material has three layers:
+     1. body       — tint + vertical sheen + fine grain (background)
+     2. refraction — backdrop blur/saturate, plus a genuine SVG
+                     feDisplacementMap where the engine supports it
+     3. surface    — ::before specular edge stack, ::after cursor glow
 
-   Typography is never put behind heavy blur: contrast first.
-   Fallback: @supports not (backdrop-filter) → solid ink surface.
+   Layering notes:
+     • `isolation: isolate` makes each panel its own stacking context so
+       the two pseudo-elements can sit at z-index -1: above the panel's
+       own tint, below its text. Highlight and glow never wash over copy.
+     • No `border-radius` here — the shape belongs to the layout utility
+       (`rounded-full` for pills, `rounded-2xl` for cards). The pseudo
+       elements use `border-radius: inherit`, so they always match.
+
+   Everything lives in @layer components so Tailwind utilities (which are
+   in the later `utilities` layer) still win when a component overrides a
+   property — e.g. `hover:bg-white/8` on a glass button.
    ============================================================ */
 
-/* ------------------------------------------------------------
-   The displacement lens (SVG filter, defined in GlassLensProvider).
-   backdrop-filter: url(#id) refracts what is BEHIND the element —
-   genuine contextual distortion, not a fake gradient.
-   Safari note: Safari 18+ supports url() filters in backdrop-filter;
-   older Safari/Firefox fall back to blur-based glass automatically.
-   ------------------------------------------------------------ */
-
-.glass-lens {
-  composes: glass;
-  -webkit-backdrop-filter: blur(2px) url(#brick-lens);
-  backdrop-filter: blur(2px) url(#brick-lens);
-  /* Fallback for engines that reject url() in backdrop-filter:
-     the property is dropped and .glass-lens inherits .glass visuals. */
-}
-
-/* Lens needs a stronger edge to read as a lens. */
-.glass-lens::after {
-  background: linear-gradient(
-    to bottom,
-    rgb(255 255 255 / 0.4),
-    rgb(255 255 255 / 0.08) 28%,
-    transparent 62%
-  );
-}
-
-/* ------------------------------------------------------------
-   Fine noise — kills banding on translucent surfaces.
-   Inline SVG feTurbulence data-URI, 3% opacity, no runtime cost.
-   ------------------------------------------------------------ */
-.glass-noise::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-  mix-blend-mode: overlay;
-}
-
-/* ============================================================
-   Material tiers by semantic importance
-   ============================================================ */
-
-/* Focal surfaces (nav, primary CTA) — lens + level-3 material */
-.glass-focal {
-  --glass-surface: var(--glass-3-surface);
-  --glass-border: var(--glass-3-border);
-  --glass-blur: var(--glass-3-blur);
-  --glass-shadow: var(--shadow-3);
-}
-
-/* Content surfaces (cards, panels) — level-2 material */
-.glass-content {
-  --glass-surface: var(--glass-2-surface);
-  --glass-border: var(--glass-2-border);
-  --glass-blur: var(--glass-2-blur);
-  --glass-shadow: var(--shadow-2);
-}
-
-/* Secondary surfaces (tiles, chips) — level-1, lighter */
-.glass-secondary {
-  --glass-surface: var(--glass-1-surface);
-  --glass-border: var(--glass-1-border);
-  --glass-blur: var(--glass-1-blur);
-  --glass-shadow: var(--shadow-1);
-}
-
-/* Tertiary — barely-there translucency */
-.glass-tertiary {
-  --glass-surface: var(--glass-0-surface);
-  --glass-border: var(--glass-0-border);
-  --glass-blur: var(--glass-0-blur);
-  --glass-shadow: none;
-}
-
-/* Interactive lift on hover for glass content surfaces.
-   Disabled on coarse pointers and reduced motion. */
-@media (hover: hover) and (pointer: fine) {
-  .glass-interactive {
-    transition:
-      transform 240ms var(--ease-glass),
-      border-color 240ms var(--ease-glass),
-      box-shadow 240ms var(--ease-glass);
-  }
-  .glass-interactive:hover {
-    transform: translateY(-2px);
-    border-color: rgb(255 255 255 / 0.22);
-    box-shadow: var(--shadow-3);
-  }
-}
-
-/* ------------------------------------------------------------
-   Fallbacks — the site must look intentional without the lens.
-   ------------------------------------------------------------ */
-
-/* No backdrop-filter support: opaque ink surfaces, same hierarchy. */
-@supports not (
-  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
-) {
+@layer components {
+  /* ------------------------------------------------------------
+     1. THE BASE MATERIAL
+     .glass-lens is included on purpose: primary CTAs carry only that
+     class, and v2's `composes:` never gave them the base material.
+     ------------------------------------------------------------ */
   .glass,
+  .glass-panel,
   .glass-lens {
-  composes: glass;
-    background-color: color-mix(in srgb, var(--ink-800) 86%, transparent);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    position: relative;
+    isolation: isolate;
+    background-color: var(--glass-tint, rgb(255 255 255 / 0.055));
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.075) 0%,
+        rgb(255 255 255 / 0.022) 38%,
+        rgb(255 255 255 / 0) 100%
+      );
+    background-size:
+      160px 160px,
+      100% 100%;
+    border: 1px solid var(--glass-border, rgb(255 255 255 / 0.14));
+    box-shadow: var(--glass-shadow, var(--shadow-2));
+
+    /* Layer 2, always valid: what an engine cannot do is drop the later
+       url() rule, never this one. Safari keeps this -webkit- form. */
+    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6)
+      brightness(1.06);
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6) brightness(1.06);
+  }
+
+  /* ------------------------------------------------------------
+     Layer 2b — real refraction (Chromium).
+     A separate rule, gated on a runtime capability check performed by
+     GlassLensProvider (CSS.supports + the filter actually being in the
+     DOM). If the engine cannot parse url() in backdrop-filter the whole
+     declaration is discarded and the blur rule above still applies, so
+     the fallback is graceful rather than invisible.
+     NOTE: -webkit-backdrop-filter is deliberately left out — Safari's
+     support for SVG filter references in backdrop-filter is unreliable,
+     so it gets the blur+saturate material instead.
+     ------------------------------------------------------------ */
+  [data-glass-lens="on"] .glass,
+  [data-glass-lens="on"] .glass-panel,
+  [data-glass-lens="on"] .glass-lens {
+    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6) brightness(1.06)
+      url(#glass-distortion);
+  }
+
+  /* ------------------------------------------------------------
+     Layer 3a — specular edge.
+     Three inset highlights: a bright crisp top edge (light catching the
+     bevel), a faint bottom edge and a soft left edge. This is what
+     actually reads as "glass" rather than "tinted box".
+     ------------------------------------------------------------ */
+  .glass::before,
+  .glass-panel::before,
+  .glass-lens::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 0 1.5px 0 rgb(255 255 255 / 0.8),
+      inset 0 -1px 0 rgb(255 255 255 / 0.08),
+      inset 1px 0 0 rgb(255 255 255 / 0.22),
+      inset -1px 0 0 rgb(255 255 255 / 0.06);
+  }
+
+  /* ------------------------------------------------------------
+     Layer 3b — cursor-reactive inner glow.
+     --mx / --my are written by <GlassPointer> (one document listener,
+     batched into a frame, no React state). Fine pointers only: on touch
+     there is no cursor to follow.
+     ------------------------------------------------------------ */
+  .glass::after,
+  .glass-panel::after,
+  .glass-lens::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-base, 260ms) var(--ease-glass, ease);
+    background: radial-gradient(
+      circle 240px at var(--mx, 50%) var(--my, 50%),
+      rgb(255 255 255 / 0.17),
+      transparent 62%
+    );
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .glass:hover::after,
+    .glass-panel:hover::after,
+    .glass-lens:hover::after {
+      opacity: 1;
+    }
+  }
+
+  /* ------------------------------------------------------------
+     Material levels 0–5 — presence by semantic importance.
+     Values come from the design tokens in globals.css.
+     ------------------------------------------------------------ */
+  .glass-0 {
+    --glass-tint: var(--glass-0-surface);
+    --glass-border: var(--glass-0-border);
+    --glass-blur: var(--glass-0-blur);
+    --glass-shadow: none;
+  }
+
+  .glass-1 {
+    --glass-tint: var(--glass-1-surface);
+    --glass-border: var(--glass-1-border);
+    --glass-blur: var(--glass-1-blur);
+    --glass-shadow: var(--shadow-1);
+  }
+
+  .glass-2 {
+    --glass-tint: var(--glass-2-surface);
+    --glass-border: var(--glass-2-border);
+    --glass-blur: var(--glass-2-blur);
+    --glass-shadow: var(--shadow-2);
+  }
+
+  .glass-3 {
+    --glass-tint: var(--glass-3-surface);
+    --glass-border: var(--glass-3-border);
+    --glass-blur: var(--glass-3-blur);
+    --glass-shadow: var(--shadow-3);
+  }
+
+  .glass-4 {
+    --glass-tint: var(--glass-4-surface);
+    --glass-border: var(--glass-4-border);
+    --glass-blur: var(--glass-4-blur);
+    --glass-shadow: var(--shadow-3);
+  }
+
+  .glass-5 {
+    --glass-tint: var(--glass-5-surface);
+    --glass-border: var(--glass-5-border);
+    --glass-blur: var(--glass-5-blur);
+    --glass-shadow: var(--shadow-4);
+  }
+
+  /* Soft accent bleed, for panels that should feel lit from within. */
+  .glass-glow {
+    box-shadow:
+      var(--glass-shadow, var(--shadow-2)),
+      0 0 44px -14px rgb(224 85 47 / 0.34);
+  }
+
+  /* Focal elements (nav, hero CTAs) get a stronger top sheen. */
+  .glass-lens {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+      linear-gradient(
+        180deg,
+        rgb(255 255 255 / 0.17) 0%,
+        rgb(255 255 255 / 0.035) 34%,
+        rgb(255 255 255 / 0) 62%
+      );
+  }
+
+  /* Interactive lift — opt-in, fine pointers only. */
+  @media (hover: hover) and (pointer: fine) {
+    .glass-interactive {
+      transition:
+        transform 240ms var(--ease-glass),
+        border-color 240ms var(--ease-glass),
+        box-shadow 240ms var(--ease-glass);
+    }
+    .glass-interactive:hover {
+      transform: translateY(-2px);
+      border-color: rgb(255 255 255 / 0.22);
+      box-shadow: var(--shadow-3);
+    }
+  }
+
+  /* ------------------------------------------------------------
+     Fallbacks — the site must stay intentional without the material,
+     and opaque enough to re-establish contrast where blur is off.
+     ------------------------------------------------------------ */
+  @supports not (
+    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+  ) {
+    .glass,
+    .glass-panel,
+    .glass-lens {
+      background-color: color-mix(in srgb, var(--ink-800) 88%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .glass-panel,
+    .glass-lens {
+      background-color: color-mix(in srgb, var(--ink-850) 94%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 }
 
-@media (prefers-reduced-transparency: reduce) {
-  .glass,
-  .glass-lens {
-  composes: glass;
-    background-color: color-mix(in srgb, var(--ink-850) 94%, transparent);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
+
