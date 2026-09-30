@@ -58,6 +58,10 @@ describe("glass material contract", () => {
   it("gates real refraction behind the runtime capability flag", () => {
     expect(css).toContain('[data-glass-lens="on"]');
     expect(css).toContain("url(#glass-distortion)");
+    // both filters the provider defines are actually used by the material —
+    // an unreferenced filter is dead weight
+    expect(css).toContain("url(#glass-distortion-soft)");
+    expect(provider).toContain('id="glass-distortion-soft"');
     // the -webkit- fallback must never carry the SVG reference: Safari's
     // support for it is unreliable, and a dropped declaration there would
     // remove the blur entirely

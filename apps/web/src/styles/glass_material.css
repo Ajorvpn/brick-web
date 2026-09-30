@@ -82,6 +82,15 @@
       url(#glass-distortion);
   }
 
+  /* Small surfaces (pills, chips, badges) get the same technique tuned down:
+     a 40px displacement that reads as liquid across a 400px card smears a
+     40px-tall pill. Same filter shape, gentler numbers. */
+  [data-glass-lens="on"] .glass-0,
+  [data-glass-lens="on"] .glass-1 {
+    backdrop-filter: blur(var(--glass-blur, 8px)) saturate(1.6) brightness(1.06)
+      url(#glass-distortion-soft);
+  }
+
   /* ------------------------------------------------------------
      Layer 3a — specular edge.
      Three inset highlights: a bright crisp top edge (light catching the
