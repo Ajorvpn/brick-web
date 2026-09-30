@@ -25,16 +25,18 @@ interface brick_props {
 /**
  * Hero journey keyframes (position + rotation). Scroll scrubs between them:
  *   0.00  hero pose — right field, slight angle, all faces visible
- *   0.30  camera-approach lean; brick turns to face its future slot
- *   0.55  descends toward the wall plane
- *   0.75  aligns with the slot
- *   1.00  seated — flush with masonry rhythm (x=0,y=0 row of the wall)
- */const JOURNEY: { p: [number, number, number]; r: [number, number, number] }[] = [
+ *   0.25  anticipation: lifts a touch, turns to face the wall
+ *   0.50  travels to sit DIRECTLY ABOVE its slot in the base course
+ *   0.75  inside the wall plane, still above the mortar bed
+ *   1.00  seated — the last two segments are a straight drop onto the course,
+ *         so the hero brick falls from above exactly like every other unit
+ */
+const JOURNEY: { p: [number, number, number]; r: [number, number, number] }[] = [
   { p: [0.9, 0.05, 0], r: [0.03, 0.72, 0.015] },
-  { p: [0.6, -0.2, 0.6], r: [0.05, 0.5, -0.02] },
-  { p: [0.3, -0.65, 0.4], r: [0.04, 0.2, 0.01] },
-  { p: [0.06, -1.0, -0.75], r: [0.0, 0.06, 0.0] },
-  { p: HERO_SLOT, r: [0, 0, 0] }, // exact wall slot — bottom course, center
+  { p: [0.6, 0.5, 0.3], r: [0.02, 0.42, 0.01] },
+  { p: [0.0, 0.55, -1.05], r: [0, 0.1, 0] },
+  { p: [0.0, 0.12, -1.55], r: [0, 0.04, 0] },
+  { p: HERO_SLOT, r: [0, 0, 0] }, // seated — base course, centre
 ];
 
 /** Cubic ease for scrubbed segments (mass feel, no bounce). */

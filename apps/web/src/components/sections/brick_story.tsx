@@ -7,6 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { BrickButtonLink } from "@/components/ui/brick_button";
 import { StatusPill } from "@/components/ui/status_pill";
 import { WebGLBoundary } from "@/components/three/webgl_boundary";
+import { Reveal } from "@/components/animation/reveal";
 import { HeroFallback, HeroFallbackMobile } from "./hero_fallback";
 import { isWebglAvailable } from "@/lib/quality";
 import { REPO_URL } from "@/content/project_facts";
@@ -70,13 +71,16 @@ function useSceneMode(): SceneMode {
 const PHASES = [
   { at: 0.0, label: "Phase 01 · Foundation", title: "A brick." },
   {
-    at: 0.3,
-    label: "Phase 02 · The build begins",
+    at: 0.24,
+    label: "Phase 02 · The first course",
     title: "It finds its place.",
   },
-  { at: 0.6, label: "Phase 03 · Masonry", title: "Walls rise from layers." },
-  { at: 0.85, label: "Phase 04 · Structure", title: "Built brick by brick." },
+  { at: 0.5, label: "Phase 03 · Masonry", title: "Walls rise from layers." },
+  { at: 0.8, label: "Phase 04 · Structure", title: "Built brick by brick." },
 ] as const;
+
+/** Scroll distance the whole build is mapped onto, in px. */
+const STORY_SCROLL = 3400;
 
 /**
  * BrickStory — the cinematic scroll narrative.
@@ -130,7 +134,7 @@ export function BrickStory() {
       scrollTrigger: {
         trigger: el,
         start: "top top",
-        end: "+=2800",
+        end: `+=${STORY_SCROLL}`,
         scrub: 1,
         pin: pin_ref.current,
         anticipatePin: 1,
@@ -140,9 +144,12 @@ export function BrickStory() {
 
     // Continuous progress mapping — scroll position IS the animation state.
     // Proxies are written by GSAP; the scene reads them per frame.
-    tl.to(story_proxy, { current: 1, duration: 0.55, ease: "none" }, 0)
-      .to(build_proxy, { current: 1, duration: 0.4, ease: "none" }, 0.45)
-      // hold at the end so the wall is contemplated before the next section
+    //   story  — the hero brick falls into the base course
+    //   build  — the wall is laid above it, course by course
+    // Both are monotonic, so scrubbing back up un-builds the wall in order.
+    tl.to(story_proxy, { current: 1, duration: 0.42, ease: "none" }, 0)
+      .to(build_proxy, { current: 1, duration: 0.55, ease: "none" }, 0.4)
+      // hold at the end so the finished wall is contemplated
       .to({}, { duration: 0.05 });
 
     // Hero copy hands over to the story: fade + lift as the build begins.
@@ -168,8 +175,8 @@ export function BrickStory() {
     PHASES.forEach((p, i) => {
       const st = ScrollTrigger.create({
         trigger: el,
-        start: `top+=${p.at * 2800} center`,
-        end: `top+=${(PHASES[i + 1]?.at ?? 1.05) * 2800} center`,
+        start: `top+=${p.at * STORY_SCROLL} center`,
+        end: `top+=${(PHASES[i + 1]?.at ?? 1.05) * STORY_SCROLL} center`,
         onToggle: (self) => {
           if (self.isActive) set_phase(i);
         },
@@ -190,7 +197,7 @@ export function BrickStory() {
       ref={story_ref}
       id="story"
       aria-label="Brick story"
-      className={mode === "webgl" ? "relative h-[380vh]" : "relative h-screen"}
+      className={mode === "webgl" ? "relative h-[460vh]" : "relative h-screen"}
     >
       <div ref={pin_ref} className="h-screen overflow-hidden">
         {/* spatial scene */}
@@ -220,42 +227,48 @@ export function BrickStory() {
             className="absolute inset-x-0 top-[22vh] mx-auto max-w-[var(--content-width)] px-6 sm:px-8"
           >
             <div className="max-w-xl">
-              <StatusPill
-                label="Open source · Privacy first"
-                className="mb-7 glass-lens"
-              />
-              <h1
-                id="hero-heading"
-                className="text-balance text-[2.7rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink-050 sm:text-7xl lg:text-[5rem]"
-              >
-                Privacy, built
-                <br />
-                brick by brick.
-              </h1>
-              <p className="mt-6 max-w-md text-pretty text-lg leading-relaxed text-ink-200">
-                Brick is a free, open-source VPN client engineered around
-                privacy, performance, and transparent development.
-              </p>
-              <div className="pointer-events-auto mt-9 flex flex-wrap items-center gap-4">
-                <BrickButtonLink
-                  href={REPO_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  size="lg"
-                  className="glass-lens"
+              <Reveal y={18}>
+                <StatusPill
+                  label="Open source · Privacy first"
+                  className="mb-7 glass-lens"
+                />
+                <h1
+                  id="hero-heading"
+                  className="text-balance text-[2.7rem] font-semibold leading-[1.03] tracking-[-0.035em] text-ink-050 sm:text-7xl lg:text-[5rem]"
                 >
-                  Follow the build
-                  <span aria-hidden>→</span>
-                </BrickButtonLink>
-                <BrickButtonLink
-                  href="#what-is-brick"
-                  variant="secondary"
-                  size="lg"
-                  className="glass-lens"
-                >
-                  Explore Brick
-                </BrickButtonLink>
-              </div>
+                  Privacy, built
+                  <br />
+                  brick by brick.
+                </h1>
+              </Reveal>
+              <Reveal y={16} delay={0.12}>
+                <p className="mt-6 max-w-md text-pretty text-lg leading-relaxed text-ink-200">
+                  Brick is a free, open-source VPN client engineered around
+                  privacy, performance, and transparent development.
+                </p>
+              </Reveal>
+              <Reveal y={14} delay={0.24}>
+                <div className="pointer-events-auto mt-9 flex flex-wrap items-center gap-4">
+                  <BrickButtonLink
+                    href={REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    size="lg"
+                    className="glass-lens"
+                  >
+                    Follow the build
+                    <span aria-hidden>→</span>
+                  </BrickButtonLink>
+                  <BrickButtonLink
+                    href="#what-is-brick"
+                    variant="secondary"
+                    size="lg"
+                    className="glass-lens"
+                  >
+                    Explore Brick
+                  </BrickButtonLink>
+                </div>
+              </Reveal>
             </div>
           </div>
         </div>
