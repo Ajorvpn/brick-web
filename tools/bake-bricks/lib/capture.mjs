@@ -32,12 +32,22 @@ export async function openPage(browser, { url, width, height, dpr = 1, reducedMo
   page.on("console", (m) => {
     if (m.type() === "error") errors.push(m.text());
   });
-  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180_000 });
   return { context, page, errors };
 }
 
+/** Wait only for the debug hook: enough to drive progress by hand. */
+export async function waitForHook(page, { timeout = 180_000, settle = 8000 } = {}) {
+  await page.waitForFunction(
+    () => typeof window.__brick?.setProgress === "function",
+    undefined,
+    { timeout },
+  );
+  await page.waitForTimeout(settle);
+}
+
 /** Wait until the debug hook exists and the poster has handed over to WebGL. */
-export async function waitForScene(page, { timeout = 90_000 } = {}) {
+export async function waitForScene(page, { timeout = 180_000 } = {}) {
   await page.waitForFunction(
     () => typeof window.__brick?.setProgress === "function",
     undefined,
@@ -51,8 +61,8 @@ export async function waitForScene(page, { timeout = 90_000 } = {}) {
     undefined,
     { timeout },
   );
-  // let a few frames land after the textures were decoded
-  await page.waitForTimeout(1500);
+  // Software rendering runs at ~1 fps here: give the first frames real time.
+  await page.waitForTimeout(2500);
 }
 
 export async function setProgress(page, p, settle = 900) {

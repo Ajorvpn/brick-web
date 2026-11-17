@@ -53,8 +53,8 @@ const ease = (t: number, kind: Ease) => {
  * pitch. More than that reads as a game object, not a masonry unit.
  */
 const JOURNEY: Keyframe[] = [
-  { p: BEATS.handoff, pos: [1.68, 18.35, 1.15], rot: [-0.175, 0.61, 0.05], ease: "inOut" },
-  { p: 0.2, pos: [0.62, 17.35, 0.3], rot: [-0.07, 0.24, 0.02], ease: "inOut" },
+  { p: BEATS.handoff, pos: [2.5, 21.4, 1.5], rot: [-0.175, 0.61, 0.05], ease: "inOut" },
+  { p: 0.2, pos: [0.75, 17.9, 0.34], rot: [-0.07, 0.24, 0.02], ease: "inOut" },
   { p: 0.3, pos: [0, SOCKET[1] + 1.0, -0.12], rot: [-0.02, 0.02, 0], ease: "inOut" },
   { p: 0.4, pos: [0, SOCKET[1] + 0.6, SOCKET[2] + 0.06], rot: [0, 0, 0], ease: "in" },
   { p: BEATS.impact + 0.002, pos: [SOCKET[0], SOCKET[1], SOCKET[2]], rot: [0, 0, 0], ease: "out" },
@@ -158,10 +158,21 @@ function GoldFlare() {
 export function Keystone({ materials }: { materials: BrickMaterialSet }) {
   const group = useRef<THREE.Group>(null);
   const emblem = useEmblemGeometry(1);
-  const body = useMemo(
-    () => new RoundedBoxGeometry(BRICK_SIZE[0], BRICK_SIZE[1], BRICK_SIZE[2], 5, 0.03),
-    [],
-  );
+  const body = useMemo(() => {
+    const geometry = new RoundedBoxGeometry(BRICK_SIZE[0], BRICK_SIZE[1], BRICK_SIZE[2], 5, 0.03);
+    const position = geometry.attributes.position!;
+    const normal = geometry.attributes.normal!;
+    const uv = geometry.attributes.uv!;
+    for (let i = 0; i < position.count; i++) {
+      if (normal.getZ(i) > 0.55) continue; // the face keeps the baked sheet
+      // a quiet corner of the same sheet: clay, no emblem, no groove
+      uv.setXY(i, 0.03 + (position.getX(i) / BRICK_SIZE[0] + 0.5) * 0.14, -0.02 + (position.getY(i) / BRICK_SIZE[1] + 0.5) * 0.12);
+    }
+    uv.needsUpdate = true;
+    // the baked face occlusion needs the second UV set too
+    geometry.setAttribute("uv1", uv);
+    return geometry;
+  }, []);
   const start = useRef<number | null>(null);
 
   useFrame((state) => {

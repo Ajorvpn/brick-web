@@ -40,8 +40,8 @@ import {
  * when the medallion lights up. The fov stays a long-lens 34°.
  */
 const POSES = [
-  { p: 0.0, ax: 0.35, ay: 17.25, w: 13.5, elev: 9 },
-  { p: 0.1, ax: 0.3, ay: 17.1, w: 13.0, elev: 9 },
+  { p: 0.0, ax: 1.2, ay: 19.9, w: 11.4, elev: 15 },
+  { p: 0.1, ax: 0.9, ay: 19.4, w: 10.2, elev: 13 },
   { p: 0.3, ax: 0, ay: 15.45, w: 7.2, elev: 5 },
   { p: 0.46, ax: 0, ay: 15.72, w: 5.6, elev: 4 },
   { p: 0.66, ax: 0, ay: 12.2, w: 12.6, elev: 6 },
@@ -312,14 +312,14 @@ function SceneContent({
 
   return (
     <>
-      <fogExp2 attach="fog" args={["#050507", 0.026]} />
+      <fogExp2 attach="fog" args={["#050507", 0.052]} />
 
       {/* One light direction for the whole sequence, and for the baked
           textures behind it: warm low sun from the upper left. */}
-      <hemisphereLight args={["#273540", "#120d0a", 0.55]} />
+      <hemisphereLight args={["#273540", "#120d0a", 0.3]} />
       <directionalLight
         position={[-9.5, 6.2, 11]}
-        intensity={2.5}
+        intensity={1.8}
         color="#ffe0bc"
         castShadow={shadows}
         shadow-mapSize-width={tier === "high" ? 2048 : 1024}
@@ -335,18 +335,18 @@ function SceneContent({
       />
       {/* cool counter-light from behind right: separates arrises from the
           mortar without ever reading as a second sun */}
-      <directionalLight position={[10, 2.4, -7]} intensity={0.55} color="#7fd9d2" />
+      <directionalLight position={[10, 2.4, -7]} intensity={0.4} color="#7fd9d2" />
 
       <Environment resolution={tier === "high" ? 256 : 128} frames={1}>
         <Lightformer
-          intensity={1.1}
+          intensity={2.2}
           position={[-4, 6, 6]}
           rotation={[Math.PI / 2.2, 0, -Math.PI / 5]}
           scale={[10, 4, 1]}
           color="#fff2e2"
         />
         <Lightformer
-          intensity={0.45}
+          intensity={0.9}
           position={[6, 1, 4]}
           rotation={[0, -Math.PI / 2.6, 0]}
           scale={[6, 6, 1]}
@@ -387,7 +387,7 @@ export default function BrickStoryScene({ on_ready }: { on_ready?: () => void })
   return (
     <Canvas
       dpr={profile.dpr}
-      shadows={tier !== "low"}
+      shadows={tier !== "low" ? "percentage" : false}
       camera={{ fov: FOV, position: [0.35, 19.3, 13.4], near: 0.4, far: 160 }}
       gl={{
         antialias: tier !== "low",

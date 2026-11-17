@@ -180,9 +180,9 @@ export function useBrickMaterials(): BrickMaterialSet {
       roughness: 0.32,
       clearcoat: 0.25,
       clearcoatRoughness: 0.35,
-      envMapIntensity: 1.5,
-      emissive: new THREE.Color("#3a2a0c"),
-      emissiveIntensity: 0.35,
+      envMapIntensity: 3.2,
+      emissive: new THREE.Color("#5a3f12"),
+      emissiveIntensity: 0.42,
     });
     created.push(gold);
 

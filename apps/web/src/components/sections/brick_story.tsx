@@ -124,13 +124,20 @@ export function BrickStory() {
       const release = smoothstep(0.885, 0.99, p);
       const drift = release > 0 ? last.drift : 0;
       frame.style.transform =
-        `translate3d(0, ${-4 * recede}vh, 0) scale(${1 - 0.1 * recede})` +
-        ` translateY(${drift}px)`;
-      frame.style.borderRadius = `${recede * 36}px`;
+        recede > 0.001 || drift > 0.5
+          ? `translate3d(0, ${-4 * recede}vh, 0) scale(${1 - 0.1 * recede})` +
+            ` translateY(${drift}px)`
+          : "none";
+      frame.style.borderRadius = recede > 0.001 ? `${recede * 36}px` : "0px";
+      // An identity filter still forces a full-screen offscreen composite on
+      // every engine, so it is cleared rather than left at blur(0): the scene
+      // costs nothing extra until the recession actually starts.
       frame.style.filter =
-        `blur(${12 * recede + 6 * release}px) ` +
-        `brightness(${1 - 0.4 * recede - 0.06 * release}) ` +
-        `saturate(${1 - 0.2 * recede})`;
+        recede > 0.001 || release > 0.001
+          ? `blur(${12 * recede + 6 * release}px) ` +
+            `brightness(${1 - 0.4 * recede - 0.06 * release}) ` +
+            `saturate(${1 - 0.2 * recede})`
+          : "none";
       frame.style.opacity = String(1 - 0.58 * release);
     };
 

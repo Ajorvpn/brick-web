@@ -80,12 +80,12 @@ const FACE_CELLS = [
  * burnt are the under- and over-fired strays a real kiln produces.
  */
 const TONES = [
-  { id: "sand", base: "#C8A06E", soot: 0.18, seed: 0x51a3, sat: 0.92 },
-  { id: "warm", base: "#B87A4B", soot: 0.3, seed: 0x77b1, sat: 1.0 },
-  { id: "rose", base: "#A9583B", soot: 0.42, seed: 0x9c07, sat: 1.04 },
-  { id: "smoked", base: "#6B4A36", soot: 0.85, seed: 0x2e55, sat: 0.86 },
-  { id: "pale", base: "#DCC6A2", soot: 0.08, seed: 0xb41d, sat: 0.78 },
-  { id: "burnt", base: "#4E3527", soot: 1.0, seed: 0xf0a2, sat: 0.8 },
+  { id: "sand", base: "#C09C74", soot: 0.18, seed: 0x51a3, sat: 0.9 },
+  { id: "warm", base: "#B08663", soot: 0.3, seed: 0x77b1, sat: 0.94 },
+  { id: "rose", base: "#A67C63", soot: 0.42, seed: 0x9c07, sat: 0.9 },
+  { id: "smoked", base: "#7C5C46", soot: 0.85, seed: 0x2e55, sat: 0.84 },
+  { id: "pale", base: "#D0BC9C", soot: 0.08, seed: 0xb41d, sat: 0.74 },
+  { id: "burnt", base: "#5E4534", soot: 1.0, seed: 0xf0a2, sat: 0.8 },
 ];
 
 const MORTAR_LIGHT = hex("#D9CDB8");
@@ -233,7 +233,7 @@ async function bakeClayAlbedo() {
     const tone = TONES[t];
     const { height, grain, patch, chips } = clayRelief(tone.seed);
     const base = saturate(hex(tone.base), tone.sat);
-    const shade = heightToShade(height, CELL_W, CELL_H, 0.5);
+    const shade = heightToShade(height, CELL_W, CELL_H, 0.26);
     const rand = rng(tone.seed ^ 0x1234);
 
     for (let y = 0; y < CELL_H; y++) {
@@ -243,12 +243,12 @@ async function bakeClayAlbedo() {
 
         // firing variation: warmer and lighter in patches, cooler in others
         let c = mix3(
-          scale3(base, 0.86),
-          scale3(base, 1.12),
-          clamp01(0.35 + (patch[i] - 0.5) * 1.3),
+          scale3(base, 0.9),
+          scale3(base, 1.07),
+          clamp01(0.4 + (patch[i] - 0.5) * 1.15),
         );
         // sand grain modulates value, not hue
-        c = scale3(c, 0.93 + (grain[i] - 0.5) * 0.22);
+        c = scale3(c, 0.95 + (grain[i] - 0.5) * 0.15);
 
         // soot: strongest at the bottom of the face, where water runs
         const soot = tone.soot * smoothstep(0.15, 1.0, v) * (0.55 + patch[i] * 0.7);
@@ -425,7 +425,7 @@ async function bakeGlaze() {
 
 const KEY_W = 2048;
 const KEY_H = 512;
-const EMBLEM_SIZE = 0.42; // world units of the 2.2-unit face
+const EMBLEM_SIZE = 0.46; // world units of the 2.2-unit face
 const FACE_UNITS = 2.2;
 
 async function bakeKeystone() {
@@ -440,7 +440,7 @@ async function bakeKeystone() {
     fbm(x * 0.055, y * 0.055, 0x4d2, 1e6, 1e6, 4, 0.55),
   );
   const patch = generate(w, h, (x, y) =>
-    fbm(x * 0.004, y * 0.016, 0x1c7, 1e6, 1e6, 4, 0.6),
+    fbm(x * 0.007, y * 0.007, 0x1c7, 1e6, 1e6, 4, 0.6),
   );
 
   // the carved frame groove around the emblem bed
@@ -465,8 +465,8 @@ async function bakeKeystone() {
       const bed = smoothstep(emblemPx * 0.54, emblemPx * 0.46, d) * 0.05;
       height[i] =
         0.56 +
-        (grain[i] - 0.5) * 0.09 +
-        (patch[i] - 0.5) * 0.05 +
+        (grain[i] - 0.5) * 0.07 +
+        (patch[i] - 0.5) * 0.028 +
         0.07 * smoothstep(0.0, 0.035, edge) -
         groove[i] * 0.34 +
         bed;
@@ -475,7 +475,7 @@ async function bakeKeystone() {
 
   const nrm = heightToNormal(height, w, h, 1.5);
   const aoMap = heightToAO(height, w, h, 10, 2.6);
-  const shade = heightToShade(height, w, h, 0.5);
+  const shade = heightToShade(height, w, h, 0.22);
 
   const sand = hex("#C8A06E");
   const rose = hex("#A9583B");
