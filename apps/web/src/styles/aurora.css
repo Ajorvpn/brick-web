@@ -26,69 +26,69 @@
 .aurora-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.42;
+  filter: blur(64px);
+  opacity: 0.55;
   will-change: transform, opacity;
 }
 
 /* warm clay — the brand accent, largest, drifting from the left */
 .aurora-blob-clay {
-  width: 52vw;
-  height: 52vw;
-  left: -14vw;
-  top: -12vh;
+  width: 68vw;
+  height: 68vw;
+  left: -18vw;
+  top: -14vh;
   background: radial-gradient(
     circle at 50% 50%,
-    rgb(196 72 32 / 0.62),
-    rgb(196 72 32 / 0.16) 58%,
-    transparent 72%
+    rgb(196 72 32 / 0.75),
+    rgb(196 72 32 / 0.22) 55%,
+    transparent 68%
   );
-  animation: aurora-drift-clay 54s ease-in-out infinite alternate;
+  animation: aurora-drift-clay 50s ease-in-out infinite alternate;
 }
 
 /* cyan — the cool counter-light, upper right */
 .aurora-blob-cyan {
-  width: 44vw;
-  height: 44vw;
-  right: -10vw;
-  top: 4vh;
+  width: 58vw;
+  height: 58vw;
+  right: -14vw;
+  top: 2vh;
   background: radial-gradient(
     circle at 50% 50%,
-    rgb(88 200 221 / 0.34),
-    rgb(88 200 221 / 0.1) 55%,
-    transparent 70%
+    rgb(88 200 221 / 0.5),
+    rgb(88 200 221 / 0.16) 52%,
+    transparent 66%
   );
-  animation: aurora-drift-cyan 71s ease-in-out infinite alternate;
+  animation: aurora-drift-cyan 66s ease-in-out infinite alternate;
 }
 
 /* violet — depth in the lower middle */
 .aurora-blob-violet {
-  width: 56vw;
-  height: 56vw;
-  left: 18vw;
-  bottom: -26vh;
+  width: 72vw;
+  height: 72vw;
+  left: 12vw;
+  bottom: -30vh;
   background: radial-gradient(
     circle at 50% 50%,
-    rgb(139 127 212 / 0.3),
-    rgb(139 127 212 / 0.08) 55%,
-    transparent 70%
+    rgb(139 127 212 / 0.42),
+    rgb(139 127 212 / 0.12) 52%,
+    transparent 66%
   );
-  animation: aurora-drift-violet 83s ease-in-out infinite alternate;
+  animation: aurora-drift-violet 78s ease-in-out infinite alternate;
 }
 
 /* ember — a small hot core that keeps the wall sequence warm */
 .aurora-blob-ember {
-  width: 26vw;
-  height: 26vw;
-  right: 8vw;
-  bottom: -8vh;
+  width: 36vw;
+  height: 36vw;
+  right: 6vw;
+  bottom: -10vh;
   background: radial-gradient(
     circle at 50% 50%,
-    rgb(224 85 47 / 0.4),
-    rgb(224 85 47 / 0.12) 52%,
-    transparent 68%
+    rgb(224 85 47 / 0.55),
+    rgb(224 85 47 / 0.18) 50%,
+    transparent 64%
   );
-  animation: aurora-drift-ember 44s ease-in-out infinite alternate;
+  animation: aurora-drift-ember 42s ease-in-out infinite alternate;
 }
 
 /* fine grain veil — kills gradient banding over large areas */
@@ -104,44 +104,44 @@
 @keyframes aurora-drift-clay {
   from {
     transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.34;
+    opacity: 0.45;
   }
   to {
-    transform: translate3d(9vw, 8vh, 0) scale(1.16);
-    opacity: 0.52;
+    transform: translate3d(10vw, 9vh, 0) scale(1.2);
+    opacity: 0.65;
   }
 }
 
 @keyframes aurora-drift-cyan {
   from {
     transform: translate3d(0, 0, 0) scale(1.08);
-    opacity: 0.26;
+    opacity: 0.38;
   }
   to {
-    transform: translate3d(-11vw, 10vh, 0) scale(0.94);
-    opacity: 0.44;
+    transform: translate3d(-12vw, 11vh, 0) scale(0.92);
+    opacity: 0.58;
   }
 }
 
 @keyframes aurora-drift-violet {
   from {
     transform: translate3d(0, 0, 0) scale(0.96);
-    opacity: 0.3;
+    opacity: 0.4;
   }
   to {
-    transform: translate3d(-7vw, -9vh, 0) scale(1.14);
-    opacity: 0.46;
+    transform: translate3d(-8vw, -10vh, 0) scale(1.18);
+    opacity: 0.6;
   }
 }
 
 @keyframes aurora-drift-ember {
   from {
     transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.3;
+    opacity: 0.4;
   }
   to {
-    transform: translate3d(-6vw, -7vh, 0) scale(1.2);
-    opacity: 0.5;
+    transform: translate3d(-7vw, -8vh, 0) scale(1.25);
+    opacity: 0.65;
   }
 }
 

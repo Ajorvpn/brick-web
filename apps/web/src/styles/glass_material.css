@@ -59,9 +59,9 @@
 
     /* Layer 2, always valid: what an engine cannot do is drop the later
        url() rule, never this one. Safari keeps this -webkit- form. */
-    -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6)
-      brightness(1.06);
-    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6) brightness(1.06);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 12px)) saturate(1.6)
+      brightness(1.08);
+    backdrop-filter: blur(var(--glass-blur, 12px)) saturate(1.6) brightness(1.08);
   }
 
   /* ------------------------------------------------------------
@@ -78,7 +78,7 @@
   [data-glass-lens="on"] .glass,
   [data-glass-lens="on"] .glass-panel,
   [data-glass-lens="on"] .glass-lens {
-    backdrop-filter: blur(var(--glass-blur, 14px)) saturate(1.6) brightness(1.06)
+    backdrop-filter: blur(var(--glass-blur, 12px)) saturate(1.6) brightness(1.08)
       url(#glass-distortion);
   }
 
@@ -87,7 +87,7 @@
      40px-tall pill. Same filter shape, gentler numbers. */
   [data-glass-lens="on"] .glass-0,
   [data-glass-lens="on"] .glass-1 {
-    backdrop-filter: blur(var(--glass-blur, 8px)) saturate(1.6) brightness(1.06)
+    backdrop-filter: blur(var(--glass-blur, 8px)) saturate(1.6) brightness(1.08)
       url(#glass-distortion-soft);
   }
 
@@ -107,10 +107,10 @@
     border-radius: inherit;
     pointer-events: none;
     box-shadow:
-      inset 0 1.5px 0 rgb(255 255 255 / 0.8),
-      inset 0 -1px 0 rgb(255 255 255 / 0.08),
-      inset 1px 0 0 rgb(255 255 255 / 0.22),
-      inset -1px 0 0 rgb(255 255 255 / 0.06);
+      inset 0 1.5px 0 rgb(255 255 255 / 0.85),
+      inset 0 -1px 0 rgb(255 255 255 / 0.1),
+      inset 1px 0 0 rgb(255 255 255 / 0.26),
+      inset -1px 0 0 rgb(255 255 255 / 0.08);
   }
 
   /* ------------------------------------------------------------
@@ -129,7 +129,7 @@
     border-radius: inherit;
     pointer-events: none;
     opacity: 0;
-    transition: opacity var(--duration-base, 260ms) var(--ease-glass, ease);
+    transition: opacity var(--duration-small, 260ms) var(--ease-out-expo);
     background: radial-gradient(
       circle 240px at var(--mx, 50%) var(--my, 50%),
       rgb(255 255 255 / 0.17),
@@ -210,17 +210,18 @@
       );
   }
 
-  /* Interactive lift — opt-in, fine pointers only. */
+  /* Interactive lift — opt-in, fine pointers only. Spring-like feel via
+     the shared micro/small tokens. */
   @media (hover: hover) and (pointer: fine) {
     .glass-interactive {
       transition:
-        transform 240ms var(--ease-glass),
-        border-color 240ms var(--ease-glass),
-        box-shadow 240ms var(--ease-glass);
+        transform var(--duration-micro, 150ms) var(--ease-out-expo),
+        border-color var(--duration-small, 260ms) var(--ease-out-expo),
+        box-shadow var(--duration-small, 260ms) var(--ease-out-expo);
     }
     .glass-interactive:hover {
       transform: translateY(-2px);
-      border-color: rgb(255 255 255 / 0.22);
+      border-color: rgb(255 255 255 / 0.28);
       box-shadow: var(--shadow-3);
     }
   }

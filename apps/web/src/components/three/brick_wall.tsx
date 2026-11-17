@@ -269,7 +269,7 @@ function MortarBed({ width }: { width: number }) {
             uRipple: { value: 0 },
             uSoot: { value: 0.32 },
             uFogColor: { value: new THREE.Color("#050507") },
-            uFogDensity: { value: 0.052 },
+            uFogDensity: { value: 0.02 },
           },
         ]),
       }),

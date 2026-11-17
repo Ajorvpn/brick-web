@@ -40,12 +40,15 @@ import {
  * when the medallion lights up. The fov stays a long-lens 34°.
  */
 const POSES = [
-  { p: 0.0, ax: 1.2, ay: 19.9, w: 11.4, elev: 15 },
-  { p: 0.1, ax: 0.9, ay: 19.4, w: 10.2, elev: 13 },
-  { p: 0.3, ax: 0, ay: 15.45, w: 7.2, elev: 5 },
-  { p: 0.46, ax: 0, ay: 15.72, w: 5.6, elev: 4 },
-  { p: 0.66, ax: 0, ay: 12.2, w: 12.6, elev: 6 },
-  { p: 1.0, ax: 0, ay: 11.6, w: 15.0, elev: 7 },
+  // wp: the same pose on a portrait frame. A phone cannot hold both a large
+  // hero brick and five bricks of wall, so the story zooms: tight on the
+  // keystone for the descent, wide enough for four or five bricks after.
+  { p: 0.0, ax: 1.2, axp: 2.1, ay: 19.9, w: 11.4, wp: 6.2, elev: 15 },
+  { p: 0.1, ax: 0.9, axp: 1.8, ay: 19.4, w: 10.2, wp: 6.2, elev: 13 },
+  { p: 0.3, ax: 0, axp: 0, ay: 15.45, w: 8.6, wp: 6.2, elev: 5 },
+  { p: 0.46, ax: 0, axp: 0, ay: 15.72, w: 6.8, wp: 5.6, elev: 4 },
+  { p: 0.66, ax: 0, axp: 0, ay: 11.9, w: 16.4, wp: 11.4, elev: 6 },
+  { p: 1.0, ax: 0, axp: 0, ay: 11.3, w: 19.0, wp: 13.2, elev: 7 },
 ];
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -61,8 +64,10 @@ function sample_pose(p: number) {
       const t = smooth(clamp01((p - a.p) / (b.p - a.p)));
       return {
         ax: THREE.MathUtils.lerp(a.ax, b.ax, t),
+        axp: THREE.MathUtils.lerp(a.axp, b.axp, t),
         ay: THREE.MathUtils.lerp(a.ay, b.ay, t),
         w: THREE.MathUtils.lerp(a.w, b.w, t),
+        wp: THREE.MathUtils.lerp(a.wp, b.wp, t),
         elev: THREE.MathUtils.lerp(a.elev, b.elev, t),
       };
     }
@@ -81,15 +86,15 @@ function CameraRig() {
     const p = clamp01(story_progress.p);
     const pose = sample_pose(p);
     const aspect = size.width / Math.max(1, size.height);
-    // Portrait fits a narrower slice of wall, which is what puts four or
-    // five bricks across a phone instead of one and a half.
-    const w = pose.w * (aspect < 1 ? 0.52 : 1);
+    const w = aspect < 1 ? pose.wp : pose.w;
+    // portrait keeps the hero brick clear of the copy: same story, its own aim
+    const ax = aspect < 1 ? pose.axp : pose.ax;
     const dist = w / 2 / (Math.tan(THREE.MathUtils.degToRad(FOV) / 2) * aspect);
     const elev = THREE.MathUtils.degToRad(pose.elev);
 
     // the impact nudge: four centimetres of camera, decaying. No shake.
     const spike = impact_spike(p);
-    aim.set(pose.ax, pose.ay, 0);
+    aim.set(ax, pose.ay, 0);
     camera.position.set(
       aim.x + Math.sin(spike * Math.PI) * 0.018,
       aim.y + Math.sin(elev) * dist + spike * 0.035,
@@ -312,14 +317,14 @@ function SceneContent({
 
   return (
     <>
-      <fogExp2 attach="fog" args={["#050507", 0.052]} />
+      <fogExp2 attach="fog" args={["#050507", 0.02]} />
 
       {/* One light direction for the whole sequence, and for the baked
           textures behind it: warm low sun from the upper left. */}
-      <hemisphereLight args={["#273540", "#120d0a", 0.3]} />
+      <hemisphereLight args={["#273540", "#120d0a", 0.24]} />
       <directionalLight
         position={[-9.5, 6.2, 11]}
-        intensity={1.8}
+        intensity={1.55}
         color="#ffe0bc"
         castShadow={shadows}
         shadow-mapSize-width={tier === "high" ? 2048 : 1024}
@@ -396,7 +401,7 @@ export default function BrickStoryScene({ on_ready }: { on_ready?: () => void })
       }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = 1.02;
+        gl.toneMappingExposure = 0.92;
         set_dpr.current = (dpr: number) => gl.setPixelRatio(dpr);
       }}
       style={{ background: "transparent" }}

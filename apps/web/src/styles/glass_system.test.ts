@@ -72,8 +72,8 @@ describe("glass material contract", () => {
   });
 
   it("carries the specular edge stack and the cursor glow", () => {
-    expect(css).toMatch(/inset 0 1\.5px 0 rgb\(255 255 255 \/ 0\.8\)/);
-    expect(css).toMatch(/inset 1px 0 0 rgb\(255 255 255 \/ 0\.22\)/);
+    expect(css).toMatch(/inset 0 1\.5px 0 rgb\(255 255 255 \/ 0\.85\)/);
+    expect(css).toMatch(/inset 1px 0 0 rgb\(255 255 255 \/ 0\.26\)/);
     expect(css).toContain("var(--mx");
     expect(css).toMatch(/\.glass::after/);
   });

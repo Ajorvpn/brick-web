@@ -162,6 +162,8 @@ export function BrickStory() {
         if (!el || !w) return;
         const v =
           smoothstep(w[0] - 0.035, w[0], p) * (1 - smoothstep(w[1], w[1] + 0.035, p));
+        // no CSS transition: the caption belongs to the scrub, not to a clock
+        el.style.transition = "opacity 0s, transform 0s";
         el.style.opacity = String(v);
         el.style.transform = `translateY(${(1 - v) * 10}px)`;
         el.style.visibility = v < 0.01 ? "hidden" : "visible";
@@ -338,7 +340,7 @@ export function BrickStory() {
           <div
             ref={copy_ref}
             data-story-copy
-            className="absolute inset-x-0 top-[20vh] mx-auto max-w-[var(--content-width)] px-6 will-change-transform sm:px-8"
+            className="absolute inset-x-0 top-[20vh] mx-auto max-w-[var(--content-width)] px-6 will-change-transform [text-shadow:0_2px_28px_rgb(0_0_0/0.55)] sm:px-8"
           >
             <div className="max-w-xl pointer-events-auto">
               <Reveal y={18}>
@@ -395,7 +397,7 @@ export function BrickStory() {
                   ref={(el) => {
                     caption_refs.current[i] = el;
                   }}
-                  className="glass glass-2 absolute inset-x-0 bottom-0 mx-auto w-fit rounded-full px-5 py-3 text-center"
+                  className="glass glass-2 absolute inset-x-0 bottom-0 mx-auto w-fit rounded-full bg-ink-950/55 px-5 py-3 text-center backdrop-blur-md"
                   style={{
                     opacity: mode === "webgl" ? 0 : i === 3 ? 1 : 0,
                     visibility: mode === "webgl" || i === 3 ? "visible" : "hidden",

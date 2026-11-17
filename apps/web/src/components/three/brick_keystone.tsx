@@ -269,7 +269,7 @@ export function GhostSocket() {
     const p = story_progress.p;
     // the socket announces itself as the brick lines up, then goes out
     const visible = window4(p, 0.3, 0.35, 0.448, 0.47);
-    material.uniforms.uOpacity!.value = visible * 0.85;
+    material.uniforms.uOpacity!.value = visible * 0.38;
     material.uniforms.uPulse!.value = 0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 2.2);
   });
 

@@ -82,10 +82,10 @@ const FACE_CELLS = [
 const TONES = [
   { id: "sand", base: "#C09C74", soot: 0.18, seed: 0x51a3, sat: 0.9 },
   { id: "warm", base: "#B08663", soot: 0.3, seed: 0x77b1, sat: 0.94 },
-  { id: "rose", base: "#A67C63", soot: 0.42, seed: 0x9c07, sat: 0.9 },
-  { id: "smoked", base: "#7C5C46", soot: 0.85, seed: 0x2e55, sat: 0.84 },
+  { id: "rose", base: "#A67C63", soot: 0.34, seed: 0x9c07, sat: 0.9 },
+  { id: "smoked", base: "#7C5C46", soot: 0.5, seed: 0x2e55, sat: 0.84 },
   { id: "pale", base: "#D0BC9C", soot: 0.08, seed: 0xb41d, sat: 0.74 },
-  { id: "burnt", base: "#5E4534", soot: 1.0, seed: 0xf0a2, sat: 0.8 },
+  { id: "burnt", base: "#644B39", soot: 0.62, seed: 0xf0a2, sat: 0.8 },
 ];
 
 const MORTAR_LIGHT = hex("#D9CDB8");
@@ -420,6 +420,58 @@ async function bakeGlaze() {
 }
 
 /* ---------------------------------------------------------------- */
+/* 3b. Development-status sprites                                    */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Two small sheets for the stage cards, so the CSS brick in §04 is the same
+ * fired clay as the wall instead of a gradient that only pretends to be.
+ * "lit" is the in-progress state: the same brick, warmed from the inside.
+ */
+async function bakeStageSprites() {
+  const w = 512;
+  const h = 128;
+  const base = saturate(hex("#A87750"), 0.94);
+  const { height, grain, patch, chips } = clayRelief(0x7a31, w, h);
+
+  const shade = heightToShade(height, w, h, 0.3);
+  const solid = new Uint8Array(w * h * 3);
+  const lit = new Uint8Array(w * h * 3);
+  const ember = hex("#E2552F");
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 3;
+      const u = x / w;
+      const v = y / h;
+      const edge = Math.min(u, 1 - u, v, 1 - v);
+      const wear = smoothstep(0.0, 0.05, edge);
+      let c = mix3(
+        scale3(base, 0.9),
+        scale3(base, 1.07),
+        clamp01(0.4 + (patch[y * w + x] - 0.5) * 1.2),
+      );
+      c = scale3(c, 0.95 + (grain[y * w + x] - 0.5) * 0.16);
+      c = scale3(c, 1 - shade[y * w + x] * 0.35);
+      c = scale3(c, 0.86 + wear * 0.14);
+      c = mix3(c, scale3(c, 0.55), chips[y * w + x] * 0.8);
+      solid[i] = Math.round(c[0] * 255);
+      solid[i + 1] = Math.round(c[1] * 255);
+      solid[i + 2] = Math.round(c[2] * 255);
+
+      const glow = smoothstep(0.55, 0.0, Math.hypot(u - 0.5, (v - 0.5) * 1.6));
+      const warmth = mix3(c, ember, 0.18 + glow * 0.22);
+      lit[i] = Math.round(Math.min(1, warmth[0] * (1 + glow * 0.16)) * 255);
+      lit[i + 1] = Math.round(Math.min(1, warmth[1] * (1 + glow * 0.06)) * 255);
+      lit[i + 2] = Math.round(Math.min(1, warmth[2]) * 255);
+    }
+  }
+
+  await writeMap("stage-solid.webp", solid, w, h, { quality: 88 });
+  await writeMap("stage-lit.webp", lit, w, h, { quality: 88 });
+}
+
+/* ---------------------------------------------------------------- */
 /* 4. Keystone: the highest-detail object on the page               */
 /* ---------------------------------------------------------------- */
 
@@ -588,6 +640,7 @@ async function main() {
   await bakeFaceAtlases();
   await bakeGlaze();
   await bakeKeystone();
+  await bakeStageSprites();
   await bakeEmblemContours();
 
   const total = written.reduce((n, f) => n + f.bytes, 0);

@@ -31,13 +31,22 @@ export function BrickStageTile({
         className={cn(
           "absolute inset-x-0 top-0 overflow-hidden rounded-[7px] border transition-colors",
           status === "implemented" &&
-            "border-white/12 bg-gradient-to-br from-[#a85a3c] via-[#96502f] to-[#7c3f26] shadow-[inset_0_1px_0_rgb(255_235_220/0.22),inset_0_-8px_14px_-8px_rgb(40_12_4/0.55),0_6px_16px_-6px_rgb(0_0_0/0.5)]",
+            "border-white/12 shadow-[inset_0_1px_0_rgb(255_235_220/0.22),inset_0_-8px_14px_-8px_rgb(40_12_4/0.55),0_6px_16px_-6px_rgb(0_0_0/0.5)]",
           status === "in-progress" &&
-            "border-brick-300/40 bg-gradient-to-br from-[#c46a42] via-[#b25a34] to-[#96482a] shadow-[inset_0_1px_0_rgb(255_240_225/0.3),0_0_22px_-4px_rgb(224_85_47/0.5),0_6px_16px_-6px_rgb(0_0_0/0.5)]",
+            "border-brick-300/40 shadow-[inset_0_1px_0_rgb(255_240_225/0.3),0_0_22px_-4px_rgb(224_85_47/0.5),0_6px_16px_-6px_rgb(0_0_0/0.5)]",
           status === "planned" &&
             "border-dashed border-white/20 bg-white/3",
         )}
-        style={{ height: `${Math.max(fill * 100, 22)}%` }}
+        style={{
+          height: `${Math.max(fill * 100, 22)}%`,
+          // the same baked clay the wall is made of — see tools/bake-bricks
+          backgroundImage:
+            status === "planned"
+              ? undefined
+              : `url(/bricks/stage-${status === "in-progress" ? "lit" : "solid"}.webp)`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       >
         {/* firing variation: soft horizontal banding */}
         {status !== "planned" && (
