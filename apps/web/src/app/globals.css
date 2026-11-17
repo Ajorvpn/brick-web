@@ -47,30 +47,33 @@
   --text-tertiary: var(--ink-400);
   --text-on-accent: #fff7f3;
 
-  /* -- Glass levels: surface alpha, tint, border, blur -- */
-  --glass-0-surface: rgba(255, 255, 255, 0.02);
-  --glass-0-border: rgba(255, 255, 255, 0.06);
-  --glass-0-blur: 2px;
+  /* -- Glass levels: surface alpha, tint, border, blur --
+     Section 1: tint alpha 0.06–0.12 across levels 0–4, the elevated
+     level 5 stays under ~0.18. Blur stays in the 10–16px band so
+     content behind the panel bleeds through instead of vanishing. */
+  --glass-0-surface: rgba(255, 255, 255, 0.03);
+  --glass-0-border: rgba(255, 255, 255, 0.07);
+  --glass-0-blur: 6px;
 
-  --glass-1-surface: rgba(255, 255, 255, 0.035);
+  --glass-1-surface: rgba(255, 255, 255, 0.05);
   --glass-1-border: rgba(255, 255, 255, 0.09);
   --glass-1-blur: 8px;
 
-  --glass-2-surface: rgba(255, 255, 255, 0.055);
-  --glass-2-border: rgba(255, 255, 255, 0.12);
-  --glass-2-blur: 14px;
+  --glass-2-surface: rgba(255, 255, 255, 0.07);
+  --glass-2-border: rgba(255, 255, 255, 0.11);
+  --glass-2-blur: 10px;
 
-  --glass-3-surface: rgba(255, 255, 255, 0.08);
-  --glass-3-border: rgba(255, 255, 255, 0.16);
-  --glass-3-blur: 20px;
+  --glass-3-surface: rgba(255, 255, 255, 0.09);
+  --glass-3-border: rgba(255, 255, 255, 0.13);
+  --glass-3-blur: 12px;
 
-  --glass-4-surface: rgba(255, 255, 255, 0.1);
-  --glass-4-border: rgba(255, 255, 255, 0.2);
-  --glass-4-blur: 28px;
+  --glass-4-surface: rgba(255, 255, 255, 0.11);
+  --glass-4-border: rgba(255, 255, 255, 0.15);
+  --glass-4-blur: 14px;
 
-  --glass-5-surface: rgba(22, 22, 28, 0.72);
-  --glass-5-border: rgba(255, 255, 255, 0.14);
-  --glass-5-blur: 40px;
+  --glass-5-surface: rgba(255, 255, 255, 0.14);
+  --glass-5-border: rgba(255, 255, 255, 0.17);
+  --glass-5-blur: 16px;
 
   /* -- Elevation shadows -- */
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.25);
@@ -86,12 +89,14 @@
   --radius-xl: 28px;
   --radius-2xl: 36px;
 
-  /* -- Motion -- */
+  /* -- Motion — shared scale (src/lib/motion.ts) -- */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
-  --duration-fast: 150ms;
-  --duration-base: 260ms;
-  --duration-slow: 600ms;
+  --duration-micro: 150ms;
+  --duration-small: 260ms;
+  --duration-reveal: 520ms;
+  --duration-hero: 750ms;
+  --duration-impact: 190ms;
 
   /* -- Layout -- */
   --content-width: 72rem;
@@ -213,6 +218,64 @@ body {
 /* ============================================================
    Reduced motion: essential transitions only, nothing decorative
    ============================================================ */
+
+/* ============================================================
+   "The Stamped Wall" — the fixed scene layer
+   ------------------------------------------------------------
+   The canvas wrapper is fixed for the entire page and recedes with a CSS
+   transform/filter (never a WebGL pass): scale, radius, blur, dim. Both the
+   vignette and the grain live here for the same reason — they are compositor
+   work, not another full-screen shader.
+   ============================================================ */
+
+[data-brick-frame] {
+  transform-origin: 50% 42%;
+  will-change: transform, filter, opacity;
+  background-color: var(--ink-950);
+}
+
+[data-brick-sheet] {
+  will-change: transform;
+}
+
+.brick-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    118% 82% at 50% 44%,
+    transparent 42%,
+    rgb(0 0 0 / 0.42) 82%,
+    rgb(0 0 0 / 0.62) 100%
+  );
+}
+
+.brick-grain {
+  position: absolute;
+  inset: -5%;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brick-grain {
+    display: none;
+  }
+  [data-brick-frame] {
+    filter: none !important;
+    transform: none !important;
+    border-radius: 0 !important;
+    opacity: 1 !important;
+  }
+  [data-brick-sheet] {
+    transform: none !important;
+    margin-top: 0 !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

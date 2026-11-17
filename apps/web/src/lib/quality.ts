@@ -149,6 +149,14 @@ function evaluateWebgl(): WebGLCapabilities {
 export function detectQualityTier(): QualityTier {
   if (typeof window === "undefined") return "low";
 
+  // Verification hook, same spirit as ?debug=1: software-rendered CI can be
+  // asked to draw the tier a real machine would get, so screenshots show the
+  // scene as designed rather than the fallback.
+  const forced = new URLSearchParams(window.location.search).get("quality");
+  if (forced === "low" || forced === "medium" || forced === "high") {
+    return forced;
+  }
+
   const nav = navigator as Navigator & {
     deviceMemory?: number;
     connection?: { saveData?: boolean };

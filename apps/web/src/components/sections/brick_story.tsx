@@ -8,9 +8,9 @@ import { BrickButtonLink } from "@/components/ui/brick_button";
 import { StatusPill } from "@/components/ui/status_pill";
 import { WebGLBoundary } from "@/components/three/webgl_boundary";
 import { Reveal } from "@/components/animation/reveal";
-import { HeroFallback, HeroFallbackMobile } from "./hero_fallback";
 import { isWebglAvailable } from "@/lib/quality";
 import { REPO_URL } from "@/content/project_facts";
+import { smoothstep, story_progress } from "@/components/three/story_progress";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -23,27 +23,13 @@ const BrickStoryScene = dynamic(
 
 /**
  * Hero presentation mode, decided once on the client:
- *   pending — first paint; renders the static composition, identical to SSR
- *   webgl   — WebGL is available; the scroll story mounts and pins
- *   static  — reduced motion, or no usable WebGL; CSS brick, never pinned
+ *   pending — first paint; poster only, identical to SSR
+ *   webgl   — WebGL is available; the fixed scene mounts and scrubs
+ *   static  — reduced motion, or no usable WebGL; poster, never scrubbed
  */
 type SceneMode = "pending" | "webgl" | "static";
 
-/**
- * The CSS composition: what the hero shows before the scene mounts, and
- * permanently when WebGL cannot be had. Decorative by design.
- */
-function StaticComposition() {
-  return (
-    <>
-      <HeroFallback />
-      <HeroFallbackMobile />
-    </>
-  );
-}
-
 const nothing_to_subscribe_to = () => () => {};
-
 const server_scene_mode = (): SceneMode => "pending";
 
 function client_scene_mode(): SceneMode {
@@ -51,14 +37,7 @@ function client_scene_mode(): SceneMode {
   return reduced || !isWebglAvailable() ? "static" : "webgl";
 }
 
-/**
- * useSceneMode — the browser's verdict, without ever disagreeing with the
- * server. useSyncExternalStore is React's shape for reading an external
- * system: the server snapshot is the pending (static) composition, so
- * hydration always matches and the client settles the question right after.
- * Neither GPU capability nor the motion preference changes mid-session, so
- * there is genuinely nothing to subscribe to.
- */
+/** Reads the browser's verdict without ever disagreeing with the server. */
 function useSceneMode(): SceneMode {
   return useSyncExternalStore(
     nothing_to_subscribe_to,
@@ -67,58 +46,172 @@ function useSceneMode(): SceneMode {
   );
 }
 
-/** Story phases shown as copy during the pinned sequence. */
-const PHASES = [
-  { at: 0.0, label: "Phase 01 · Foundation", title: "A brick." },
-  {
-    at: 0.24,
-    label: "Phase 02 · The first course",
-    title: "It finds its place.",
-  },
-  { at: 0.5, label: "Phase 03 · Masonry", title: "Walls rise from layers." },
-  { at: 0.8, label: "Phase 04 · Structure", title: "Built brick by brick." },
+/**
+ * The four captions. Text, not canvas: they must survive reduced motion,
+ * screen readers and a dead GPU.
+ */
+const CAPTIONS = [
+  { phase: "Phase 01 · Foundation", line: "One brick." },
+  { phase: "Phase 02 · The laying", line: "It finds its place." },
+  { phase: "Phase 03 · The wall", line: "Every stage, a stamped brick." },
+  { phase: "Phase 04 · The structure", line: "Built in the open." },
 ] as const;
 
-/** Scroll distance the whole build is mapped onto, in px. */
-const STORY_SCROLL = 3400;
+/** Each caption owns a window of the master timeline. */
+const CAPTION_WINDOWS: [number, number][] = [
+  [0.1, 0.34],
+  [0.34, 0.53],
+  [0.53, 0.72],
+  [0.72, 0.9],
+];
+
+const DESKTOP_SCREENS = 4.8;
+const MOBILE_SCREENS = 4.2;
+
+declare global {
+  interface Window {
+    __brick?: {
+      setProgress: (p: number) => void;
+      getProgress: () => number;
+    };
+  }
+}
 
 /**
- * BrickStory — the cinematic scroll narrative.
+ * BrickStory — the whole scroll narrative, and the wall's life after it.
  *
- * Structure (per GSAP pinning rules):
- *   <section data-story>        ← outer: provides scroll distance
- *     <div data-story-pin>      ← inner: pinned by ScrollTrigger
- *       <canvas/> + <copy/>
+ * One canvas, `position: fixed`, mounted once for the entire page: there is
+ * no pin-to-unpin swap, so there is nothing that can jump. The section below
+ * only supplies scroll distance; a single scrubbed tween writes progress into
+ * `story_progress`, the scene reads it per frame, and the CSS recession is
+ * applied to the canvas wrapper by the same update — cheap, and identical on
+ * every engine.
  *
- * The scrubbed timeline maps scroll position → progress objects read by
- * the 3D scene each frame. Nothing plays on enter; scrolling up reverses.
+ * Beats (see story_progress for the numbers):
+ *   0.00–0.10  hero copy hands over; the keystone idles
+ *   0.08–0.30  descent: 35° of yaw turns to face-on, camera dollies in
+ *   0.30–0.46  the lay: ghost socket, alignment, a mason's press
+ *   0.45       impact: dust, a gold flare, a teal ring through the joints
+ *   0.46–0.66  reveal: the camera pulls back, the frieze lights left to right
+ *   0.66–0.88  recession: the scene becomes a blurred, rounded card
+ *   0.88–1.00  release: the wall settles into a permanent backdrop
  */
 export function BrickStory() {
-  const story_ref = useRef<HTMLElement>(null);
-  const pin_ref = useRef<HTMLDivElement>(null);
-  const story_proxy = useRef(0);
-  const build_proxy = useRef(0);
-  const canvas_ref = useRef<HTMLDivElement>(null);
-  const triggers_ref = useRef<ScrollTrigger[]>([]);
-  const [active, set_active] = useState(false);
-  const [phase, set_phase] = useState(0);
+  const section_ref = useRef<HTMLElement>(null);
+  const frame_ref = useRef<HTMLDivElement>(null);
+  const copy_ref = useRef<HTMLDivElement>(null);
+  const caption_refs = useRef<(HTMLDivElement | null)[]>([]);
   const capable_mode = useSceneMode();
-  // Set only if the scene proves unrunnable after mount — context budget
-  // exhausted, GPU process gone — at which point the boundary has already
-  // swapped in the fallback and the section should stop pinning.
+  const poster_ref = useRef<HTMLImageElement>(null);
+
+  // One attribute, so a support engineer (or a headless run) can see which
+  // presentation the browser chose without opening DevTools.
+  useEffect(() => {
+    document.documentElement.dataset.brickStory = capable_mode;
+  }, [capable_mode]);
+  const [active, set_active] = useState(false);
   const [scene_failed, set_scene_failed] = useState(false);
   const mode: SceneMode = scene_failed ? "static" : capable_mode;
 
-  // Scroll choreography — only where a canvas will actually run, so a static
-  // hero never leaves 3.8 screens of nothing to scroll through.
+  // --- the frame is written directly; React never re-renders per scroll ---
   useEffect(() => {
+    const frame = frame_ref.current;
+    if (!frame) return;
+    const last = { drift: 0, p: -1 };
+
+    const write_frame = (p: number) => {
+      const recede = smoothstep(0.66, 0.88, p);
+      const release = smoothstep(0.885, 0.99, p);
+      const drift = release > 0 ? last.drift : 0;
+      frame.style.transform =
+        `translate3d(0, ${-4 * recede}vh, 0) scale(${1 - 0.1 * recede})` +
+        ` translateY(${drift}px)`;
+      frame.style.borderRadius = `${recede * 36}px`;
+      frame.style.filter =
+        `blur(${12 * recede + 6 * release}px) ` +
+        `brightness(${1 - 0.4 * recede - 0.06 * release}) ` +
+        `saturate(${1 - 0.2 * recede})`;
+      frame.style.opacity = String(1 - 0.58 * release);
+    };
+
+    const apply = (p: number) => {
+      last.p = p;
+      write_frame(p);
+
+      // hero copy hands over, scrubbed
+      const copy = copy_ref.current;
+      if (copy) {
+        const k = smoothstep(0, 0.15, p);
+        copy.style.opacity = String(1 - k);
+        copy.style.transform = `translate3d(0, ${-40 * k}px, 0)`;
+        copy.style.filter = `blur(${8 * k}px)`;
+        copy.style.pointerEvents = k > 0.5 ? "none" : "";
+        copy.style.visibility = k > 0.98 ? "hidden" : "visible";
+      }
+
+      // captions
+      caption_refs.current.forEach((el, i) => {
+        const w = CAPTION_WINDOWS[i];
+        if (!el || !w) return;
+        const v =
+          smoothstep(w[0] - 0.035, w[0], p) * (1 - smoothstep(w[1], w[1] + 0.035, p));
+        el.style.opacity = String(v);
+        el.style.transform = `translateY(${(1 - v) * 10}px)`;
+        el.style.visibility = v < 0.01 ? "hidden" : "visible";
+      });
+
+      // the sheet: normal flow does most of the work, the transform makes it
+      // deliberate. Both are pure functions of p, so reverse is exact.
+      const sheet = document.querySelector<HTMLElement>("[data-brick-sheet]");
+      if (sheet) {
+        const lift = 1 - smoothstep(0.66, 0.88, p);
+        sheet.style.transform = `translate3d(0, ${lift * window.innerHeight * 0.9}px, 0)`;
+      }
+    };
+
+    apply(0);
+
     if (mode !== "webgl") return;
 
-    const el = story_ref.current;
-    const pin = pin_ref.current;
-    if (!el || !pin) return;
+    const section = section_ref.current;
+    if (!section) return;
 
-    // Lazy-mount WebGL only once the story region is near the viewport.
+    // scroll distance: ~480vh desktop, ~420vh mobile, in px so the sheet's
+    // transform maths has something exact to work with
+    const size = () => {
+      const h = window.innerHeight * (window.innerWidth < 768 ? MOBILE_SCREENS : DESKTOP_SCREENS);
+      section.style.height = `${h}px`;
+    };
+    size();
+
+    // the sheet overlaps the story's tail; in static mode it must not
+    const sheet = document.querySelector<HTMLElement>("[data-brick-sheet]");
+    if (sheet) sheet.style.marginTop = "-52vh";
+
+    const proxy = { p: 0 };
+    const tween = gsap.to(proxy, {
+      p: 1,
+      duration: 1,
+      ease: "none",
+      onUpdate: () => {
+        story_progress.p = proxy.p;
+        apply(proxy.p);
+      },
+    });
+
+    const trigger = ScrollTrigger.create({
+      trigger: section,
+      start: "top top",
+      end: () => `+=${section.offsetHeight}`,
+      scrub: true, // Lenis already smooths; adding scrub: 1 would mush it
+      animation: tween,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        story_progress.p = self.progress;
+      },
+    });
+
+    // lazy-mount the canvas when the story approaches the viewport
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -126,107 +219,121 @@ export function BrickStory() {
           io.disconnect();
         }
       },
-      { rootMargin: "200px" },
+      { rootMargin: "300px" },
     );
-    io.observe(el);
+    io.observe(section);
 
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: el,
-        start: "top top",
-        end: `+=${STORY_SCROLL}`,
-        scrub: 1,
-        pin: pin_ref.current,
-        anticipatePin: 1,
-        invalidateOnRefresh: true,
-      },
-    });
-
-    // Continuous progress mapping — scroll position IS the animation state.
-    // Proxies are written by GSAP; the scene reads them per frame.
-    //   story  — the hero brick falls into the base course
-    //   build  — the wall is laid above it, course by course
-    // Both are monotonic, so scrubbing back up un-builds the wall in order.
-    tl.to(story_proxy, { current: 1, duration: 0.42, ease: "none" }, 0)
-      .to(build_proxy, { current: 1, duration: 0.55, ease: "none" }, 0.4)
-      // hold at the end so the finished wall is contemplated
-      .to({}, { duration: 0.05 });
-
-    // Hero copy hands over to the story: fade + lift as the build begins.
-    tl.to(
-      "[data-story-copy] > div",
-      { opacity: 0, y: -40, duration: 0.2, ease: "power1.in" },
-      0.12,
-    );
-    const copy_st = ScrollTrigger.create({
-      trigger: el,
-      start: "top top",
-      end: "+=800",
-      scrub: true,
-      animation: gsap.to("[data-story-copy] > div", {
-        opacity: 0,
-        y: -40,
-        ease: "none",
-      }),
-    });
-    triggers_ref.current.push(copy_st);
-
-    const triggers: ScrollTrigger[] = [tl.scrollTrigger!];
-    PHASES.forEach((p, i) => {
-      const st = ScrollTrigger.create({
-        trigger: el,
-        start: `top+=${p.at * STORY_SCROLL} center`,
-        end: `top+=${(PHASES[i + 1]?.at ?? 1.05) * STORY_SCROLL} center`,
-        onToggle: (self) => {
-          if (self.isActive) set_phase(i);
-        },
+    // after release, the wall drifts at 0.04x — a background, not a scene
+    let raf = 0;
+    const on_scroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (story_progress.p < 0.995) return;
+        const end = section.offsetTop + section.offsetHeight;
+        const d = Math.max(0, window.scrollY - end + window.innerHeight) * 0.04;
+        if (Math.abs(d - last.drift) < 0.4) return;
+        last.drift = d;
+        write_frame(1);
       });
-      triggers.push(st);
-    });
+    };
+    window.addEventListener("scroll", on_scroll, { passive: true });
+
+    const on_resize = () => {
+      size();
+      ScrollTrigger.refresh();
+    };
+    window.addEventListener("resize", on_resize);
+
+    // debug hook: drive the master timeline without scrolling, so frames at
+    // exact progress values are reproducible
+    const debug_enabled =
+      process.env.NODE_ENV !== "production" ||
+      new URLSearchParams(window.location.search).get("debug") === "1";
+    if (debug_enabled) {
+      window.__brick = {
+        setProgress: (p: number) => {
+          const clamped = Math.min(1, Math.max(0, p));
+          trigger.disable(false);
+          story_progress.p = clamped;
+          tween.progress(clamped, true);
+          apply(clamped);
+        },
+        getProgress: () => story_progress.p,
+      };
+    }
+
+    requestAnimationFrame(() => ScrollTrigger.refresh());
 
     return () => {
-      triggers.forEach((t) => t.kill());
-      triggers_ref.current.forEach((t) => t.kill());
-      triggers_ref.current = [];
       io.disconnect();
+      window.removeEventListener("scroll", on_scroll);
+      window.removeEventListener("resize", on_resize);
+      if (raf) cancelAnimationFrame(raf);
+      trigger.kill();
+      tween.kill();
+      if (sheet) sheet.style.marginTop = "";
+      if (debug_enabled) delete window.__brick;
     };
   }, [mode]);
 
-  return (
-    <section
-      ref={story_ref}
-      id="story"
-      aria-label="Brick story"
-      className={mode === "webgl" ? "relative h-[460vh]" : "relative h-screen"}
-    >
-      <div ref={pin_ref} className="h-screen overflow-hidden">
-        {/* spatial scene */}
-        <div ref={canvas_ref} className="absolute inset-0" aria-hidden>
-          {mode === "webgl" && active ? (
-            <WebGLBoundary
-              fallback={<StaticComposition />}
-              on_error={() => set_scene_failed(true)}
-            >
-              <BrickStoryScene
-                story_ref={story_proxy}
-                build_ref={build_proxy}
-              />
-            </WebGLBoundary>
-          ) : (
-            <>
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_65%_40%,rgb(180_90_50/0.10),transparent_65%)]" />
-              <StaticComposition />
-            </>
-          )}
-        </div>
+  const webgl = mode === "webgl";
 
-        {/* hero copy (visible at story start, fades with progress) */}
-        <div className="absolute inset-0 z-10 pointer-events-none">
-          <div
-            data-story-copy
-            className="absolute inset-x-0 top-[22vh] mx-auto max-w-[var(--content-width)] px-6 sm:px-8"
+  return (
+    <>
+      {/* the persistent scene layer — fixed for the whole page, never pinned */}
+      <div
+        ref={frame_ref}
+        data-brick-frame
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      >
+        {/* the poster paints instantly: no layout shift, no empty frame */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={poster_ref}
+          src={webgl ? "/bricks/poster-hero.webp" : "/bricks/poster-wall.webp"}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700"
+          style={{ opacity: 1 }}
+          fetchPriority="high"
+        />
+
+        {webgl && active && (
+          <WebGLBoundary
+            fallback={null}
+            on_error={() => set_scene_failed(true)}
           >
-            <div className="max-w-xl">
+            <BrickStoryScene
+              on_ready={() => {
+                // paint, not React state: the story subtree must not re-render
+                if (poster_ref.current) poster_ref.current.style.opacity = "0";
+              }}
+            />
+          </WebGLBoundary>
+        )}
+
+        {/* post, in CSS where a CSS filter belongs: a whisper of vignette
+            and film grain, off entirely for reduced motion */}
+        <div className="brick-vignette" />
+        <div className="brick-grain" />
+      </div>
+
+      {/* scroll distance for the choreography, and the text on top of it */}
+      <section
+        ref={section_ref}
+        id="story"
+        aria-label="Brick story"
+        className={webgl ? "relative z-10" : "relative z-10 h-screen"}
+      >
+        <div className="sticky top-0 h-screen overflow-hidden">
+          {/* hero copy — hands over to the story as the keystone descends */}
+          <div
+            ref={copy_ref}
+            data-story-copy
+            className="absolute inset-x-0 top-[20vh] mx-auto max-w-[var(--content-width)] px-6 will-change-transform sm:px-8"
+          >
+            <div className="max-w-xl pointer-events-auto">
               <Reveal y={18}>
                 <StatusPill
                   label="Open source · Privacy first"
@@ -248,7 +355,7 @@ export function BrickStory() {
                 </p>
               </Reveal>
               <Reveal y={14} delay={0.24}>
-                <div className="pointer-events-auto mt-9 flex flex-wrap items-center gap-4">
+                <div className="mt-9 flex flex-wrap items-center gap-4">
                   <BrickButtonLink
                     href={REPO_URL}
                     target="_blank"
@@ -271,52 +378,55 @@ export function BrickStory() {
               </Reveal>
             </div>
           </div>
-        </div>
 
-        {/* phase copy during scroll */}
-        <div className="absolute bottom-[14vh] left-1/2 z-10 w-full max-w-md -translate-x-1/2 px-6 text-center sm:px-0">
-          {PHASES.map((p, i) => (
-            <p
-              key={p.label}
-              aria-hidden={phase !== i}
-              className={
-                "absolute inset-x-6 bottom-0 transition-all duration-500 sm:inset-x-0 " +
-                (phase === i
-                  ? "translate-y-0 opacity-100"
-                  : "translate-y-2 opacity-0")
-              }
-            >
-              <span className="font-mono text-[0.62rem] uppercase tracking-[0.3em] text-brick-300">
-                {p.label}
-              </span>
-              <span className="mt-2 block text-xl font-medium tracking-tight text-ink-100 sm:text-2xl">
-                {p.title}
-              </span>
-            </p>
-          ))}
-          {/* keep container height stable */}
-          <span className="invisible block text-xl">Placeholder</span>
-        </div>
+          {/* captions: glass chips, bottom centre */}
+          <div className="absolute inset-x-0 bottom-[9vh] z-20 flex justify-center px-6">
+            <div className="relative h-16 w-full max-w-md">
+              {CAPTIONS.map((caption, i) => (
+                <div
+                  key={caption.phase}
+                  ref={(el) => {
+                    caption_refs.current[i] = el;
+                  }}
+                  className="glass glass-2 absolute inset-x-0 bottom-0 mx-auto w-fit rounded-full px-5 py-3 text-center"
+                  style={{
+                    opacity: mode === "webgl" ? 0 : i === 3 ? 1 : 0,
+                    visibility: mode === "webgl" || i === 3 ? "visible" : "hidden",
+                  }}
+                >
+                  <span className="block font-mono text-[0.58rem] uppercase tracking-[0.28em] text-brick-300">
+                    {caption.phase}
+                  </span>
+                  <span className="mt-1 block text-[0.95rem] font-medium tracking-tight text-ink-100">
+                    {caption.line}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
 
-        {/* scroll hint at start */}
-        <div
-          aria-hidden
-          className="absolute bottom-7 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 lg:flex"
-        >
-          <span className="font-mono text-[0.6rem] uppercase tracking-[0.3em] text-ink-400">
-            Scroll
-          </span>
-          <div className="h-8 w-px bg-gradient-to-b from-white/50 to-transparent" />
+          {/* scroll hint */}
+          <div
+            aria-hidden
+            className="absolute bottom-7 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 lg:flex"
+            style={{ opacity: mode === "webgl" ? 1 : 0 }}
+          >
+            <span className="font-mono text-[0.6rem] uppercase tracking-[0.3em] text-ink-400">
+              Scroll
+            </span>
+            <div className="h-8 w-px bg-gradient-to-b from-white/50 to-transparent" />
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* screen-reader summary of the visual story */}
       <p className="sr-only">
-        The story of Brick, told in four phases: a single brick as the
-        foundation; the brick opening to reveal its layers; layers becoming
-        systems — configuration, protocols, engine, security; and a wall of
-        bricks assembling — the project built brick by brick in the open.
+        The story of Brick: one keystone brick travels down into the crown of a
+        half-metre-thick Persian brick wall — stamped bricks, a glazed frieze —
+        and is laid flush. Every stage of the project is one stamped brick in
+        that wall. The wall then recedes behind the page as a quiet backdrop.
       </p>
-    </section>
+    </>
   );
 }
+
