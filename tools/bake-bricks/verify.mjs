@@ -11,6 +11,7 @@ import { launch, openPage, urlWith, waitForHook, setProgress } from "./lib/captu
 
 const BASE = process.argv[2] ?? "http://localhost:3008/";
 const OUT = process.argv[3] ?? "/tmp/verify";
+const ONLY = process.env.ONLY ? process.env.ONLY.split(",").map(Number) : null;
 const VIEWPORTS = [
   { w: 390, h: 844, q: "medium", dpr: 1 },
   { w: 768, h: 1024, q: "medium", dpr: 1 },
@@ -23,7 +24,7 @@ const PROGRESS = process.env.PROGRESS
 await mkdir(OUT, { recursive: true });
 const browser = await launch();
 
-for (const vp of VIEWPORTS) {
+for (const vp of VIEWPORTS.filter((v) => !ONLY || ONLY.includes(v.w))) {
   const { page, errors } = await openPage(browser, {
     url: urlWith(BASE, `debug=1&quality=${vp.q}`),
     width: vp.w,

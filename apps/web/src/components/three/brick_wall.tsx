@@ -291,7 +291,7 @@ function MortarBed({ width }: { width: number }) {
 /* The frieze medallion                                                */
 /* ------------------------------------------------------------------ */
 
-function Medallion({ materials, tier }: { materials: BrickMaterialSet; tier: QualityTier }) {
+function Medallion({ materials }: { materials: BrickMaterialSet }) {
   const emblem = useEmblemGeometry(1.12);
   const plaque = materials.medallionGlaze;
   const gold = materials.gold;
@@ -308,11 +308,12 @@ function Medallion({ materials, tier }: { materials: BrickMaterialSet; tier: Qua
 
   return (
     <group position={MEDALLION}>
-      {/* glazed plaque over the six turquoise units — inset just far enough
-          that the bed of glazed brick reads around it */}
-      <mesh position={[0, 0, 0.0]} castShadow={tier !== "low"} receiveShadow>
+      {/* No plaque slab: the medallion is the glazed bed itself, with the
+          gold inlay sitting proud of it. A separate box read as a turquoise
+          panel floating in front of the wall. */}
+      <mesh position={[0, 0, -0.05]} receiveShadow>
         <boxGeometry args={[MEDALLION_SIZE[0] - 1.2, MEDALLION_SIZE[1] - 0.14, 0.08, 1, 1, 1]} />
-        <primitive object={plaque} attach="material" />
+        <meshStandardMaterial color="#0f2f31" roughness={0.9} metalness={0} />
       </mesh>
       {/* gold inlay ring, then the emblem itself */}
       <mesh position={[0, 0, 0.06]} rotation={[0, 0, 0]}>
@@ -426,7 +427,7 @@ export function BrickWall({
           : null,
       )}
 
-      <Medallion materials={materials} tier={tier} />
+      <Medallion materials={materials} />
     </group>
   );
 }

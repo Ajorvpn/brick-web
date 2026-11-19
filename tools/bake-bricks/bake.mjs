@@ -345,8 +345,8 @@ async function bakeFaceAtlases() {
 async function bakeGlaze() {
   const w = CELL_W;
   const h = CELL_H;
-  const base = hex("#2FB4B0");
-  const deep = hex("#1B8F94");
+  const base = hex("#22807E");
+  const deep = hex("#146A6E");
   const clay = hex("#B87A4B");
 
   const drift = generate(w, h, (x, y) =>
